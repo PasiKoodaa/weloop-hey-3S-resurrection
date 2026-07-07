@@ -1,8 +1,9 @@
-# WeLoop Hey 3S 时间同步工具
+# WeLoop 手表时间同步工具
 
 > 停服也能对时间。一个 HTML 文件，用 Chrome 打开即可把 WeLoop Hey 3S 手表的时间同步为当前时间，无需安装任何 app，不依赖云端服务器。
 
-WeLoop（唯乐）官方 app 早已停服，云端登录走不通，手表时间无法同步。但时间同步这件事**本就不需要云端**——它是手机和手表之间直接的 BLE 蓝牙握手。本项目通过反编译官方 app，提取了 Hey 3S 的时间同步协议，用一个纯 HTML 页面（基于浏览器原生 Web Bluetooth API）完成同步。
+WeLoop（唯乐）官方 app 早已停服，手表时间无法同步，云端登录走不通。
+本项目通过反编译官方 app，提取了 Hey 3S 的时间同步协议，用一个纯 HTML 页面（基于浏览器原生 Web Bluetooth API）完成时间同步。
 
 > 🔗 **在线直接用（无需下载）**：https://micookie2.github.io/weloop-hey3s-time-sync/
 
