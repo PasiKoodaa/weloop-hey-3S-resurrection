@@ -4,6 +4,8 @@
 
 WeLoop（唯乐）官方 app 早已停服，云端登录走不通，手表时间无法同步。但时间同步这件事**本就不需要云端**——它是手机和手表之间直接的 BLE 蓝牙握手。本项目通过反编译官方 app，提取了 Hey 3S 的时间同步协议，用一个纯 HTML 页面（基于浏览器原生 Web Bluetooth API）完成同步。
 
+> 🔗 **在线直接用（无需下载）**：https://micookie2.github.io/weloop-hey3s-time-sync/
+
 ## ✨ 特性
 
 - **零安装**：一个 HTML 文件，Chrome / Edge 打开即用
@@ -22,20 +24,43 @@ WeLoop（唯乐）官方 app 早已停服，云端登录走不通，手表时间
 | iOS / iPadOS | 任何浏览器 | ❌（Apple 不开放 Web Bluetooth） |
 | 任何平台 | Safari、Firefox | ❌ |
 
-### 步骤
+## 🚀 使用方法
+
+### 环境要求
+
+| 平台 | 浏览器 | 支持 |
+|------|--------|------|
+| Windows / macOS / Linux | Chrome、Edge、Opera | ✅ |
+| Android | Chrome（需 Android 6.0+，开启位置权限） | ✅ |
+| iOS / iPadOS | 任何浏览器 | ❌（Apple 不开放 Web Bluetooth） |
+| 任何平台 | Safari、Firefox | ❌ |
+
+### 方式一：在线版（推荐，最省事）
+
+直接在浏览器打开 GitHub Pages 托管的在线版，**无需下载、无需安装任何东西**：
+
+> 🔗 **[https://micookie2.github.io/weloop-hey3s-time-sync/](https://micookie2.github.io/weloop-hey3s-time-sync/)**
+
+打开后按下方「同步步骤」操作即可。建议收藏这个网址，以后随时对时间。
+
+### 方式二：本地运行（离线 / 在线版打不开时备用）
 
 1. **下载** [index.html](./index.html) 到本地
 2. **取消系统配对**：到系统蓝牙设置里，如果 Hey 3S 已配对，先**取消配对 / 忽略该设备**（Web Bluetooth 不能使用已配对设备，这是浏览器规范限制）
 3. **用 Chrome 打开** `index.html`
-   - 直接双击（`file://`）在某些新版 Chrome 上可能被限制，推荐用本地 http 服务器托管：
+   - 直接双击（`file://`）在某些新版 Chrome 上可能被限制（Web Bluetooth 要求 https 或 localhost 安全来源），推荐用本地 http 服务器托管：
      ```
      cd 到 index.html 所在目录
      python -m http.server 8000
      ```
      然后浏览器访问 `http://localhost:8000/`
-4. 填时区（中国填 `8`），点 **「连接并同步时间」**
-5. Chrome 弹出蓝牙设备选择框，选 **WeLoop Hey 3S**
-6. 等待日志显示 `✅ 时间同步成功` 即可
+
+### 同步步骤
+
+1. **取消系统配对**：到系统蓝牙设置里，如果 Hey 3S 已配对，先**取消配对 / 忽略该设备**（Web Bluetooth 不能使用已配对设备，这是浏览器规范限制）
+2. 打开上面任一方式的页面，填时区（中国填 `8`），点 **「连接并同步时间」**
+3. Chrome 弹出蓝牙设备选择框，选 **WeLoop Hey 3S**
+4. 等待日志显示 `✅ 时间同步成功` 即可
 
 ### 故障排除
 
