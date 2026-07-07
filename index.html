@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeLoop Hey 3S 时间同步</title>
+<style>
+  :root { --bg:#1a1a1a; --card:#262626; --border:#3a3a3a; --txt:#e0e0e0; --mut:#888; --acc:#4a9eff; --ok:#4caf50; --warn:#ff9800; --err:#f44336; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.6; max-width:720px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+  .card h2 { margin:0 0 10px; font-size:15px; color:var(--acc); font-weight:600; }
+  button { background:var(--acc); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; width:100%; transition:opacity .15s; font-weight:600; }
+  button:hover { opacity:.88; }
+  button:disabled { background:#555; cursor:not-allowed; opacity:.6; }
+  button.ghost { background:transparent; border:1px solid var(--border); color:var(--txt); }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  input, select { width:100%; background:#1f1f1f; border:1px solid var(--border); color:var(--txt); border-radius:6px; padding:8px 10px; font-size:14px; }
+  .log { background:#111; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:12px; line-height:1.5; height:280px; overflow:auto; white-space:pre-wrap; word-break:break-all; }
+  .log .i { color:#9cdcfe; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
+  .status { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; background:#3a3a3a; }
+  .status.on { background:var(--ok); color:#fff; }
+  .status.off { background:#555; color:#ccc; }
+  .note { font-size:12px; color:var(--mut); margin-top:8px; }
+  .note a { color:var(--acc); }
+  details { margin-top:10px; }
+  details summary { cursor:pointer; color:var(--mut); font-size:13px; }
+  details pre { background:#111; padding:10px; border-radius:6px; overflow:auto; font-size:11px; color:#bbb; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<h1>WeLoop Hey 3S 时间同步</h1>
+<div class="sub">基于 Web Bluetooth，协议反编译自 WeLoop 官方 app。无需安装任何东西，仅用 Chrome / Edge。</div>
+
+<div class="card">
+  <h2>1. 选择设备并同步</h2>
+  <label>时区（小时偏移，中国填 8）</label>
+  <input type="number" id="tz" value="8" step="0.5">
+  <div class="row" style="margin-top:12px;">
+    <button id="btnSync">🔗 连接并同步时间</button>
+    <button id="btnDisconnect" class="ghost" disabled>断开</button>
+  </div>
+  <div class="note">点击后 Chrome 会弹出蓝牙设备选择框，选 <b>WeLoop Hey 3S</b>。状态: <span id="status" class="status off">未连接</span></div>
+</div>
+
+<div class="card">
+  <h2>2. 日志</h2>
+  <div id="log" class="log"></div>
+</div>
+
+<div class="card">
+  <h2>说明 / 故障排除</h2>
+  <div class="note">
+    • <b>必须用 Chrome / Edge / Opera</b>（安卓 Chrome 也行）。Safari、Firefox 不支持 Web Bluetooth。<br>
+    • 页面要用 <code>https://</code> 或 <code>file://</code> 打开（直接双击本 HTML 文件即可）。<br>
+    • 安卓 Chrome：需 Android 6.0+，位置权限要开（BLE 扫描依赖位置权限）。<br>
+    • 连不上？先在系统蓝牙设置里<b>忽略/取消配对</b> Hey 3S（Web Bluetooth 不能用已配对设备），再重试。<br>
+    • 手表时间没变？断开手表蓝牙重连，部分固件要重连才刷新显示。<br>
+    • 选择框里看不到 Hey 3S？点右下角"没有看到我的设备？"，或靠近手表、给手表亮屏。
+  </div>
+  <details>
+    <summary>查看协议细节（反编译所得）</summary>
+<pre>BLE Service  : 6e400001-b5a3-f393-e0a9-77656c6f6f70  (后缀 ASCII = "weloop")
+写特征  RX   : 6e400002-b5a3-f393-e0a9-77656c6f6f70   手机 -> 手表
+通知特征 TX : 6e400003-b5a3-f393-e0a9-77656c6f6f70   手表 -> 手机
+设备名前缀   : "WeLoop Hey 3S"
+时间同步命令 : 140 (0x8C)
+时间戳算法   : (Unix秒 - 1388534400)  1388534400 = 2014-01-01 UTC
+payload(6字节): [4字节大端时间戳][时区/30min][时区/15min]
+分包         : [cmd][seq=0][payload]   6字节<18 单包
+成功返回     : [140][seq][1]
+</pre>
+  </details>
+</div>
+
+<script>
+// ===== 协议常量（反编译 WeLoop_83624.apk 所得）=====
+const WEOLOOP_SERVICE_UUID = 0x6e400001b5a3f393e0a977656c6f6f70n; // 转成 128-bit UUID 字符串
+const SVC = "6e400001-b5a3-f393-e0a9-77656c6f6f70";
+const RX  = "6e400002-b5a3-f393-e0a9-77656c6f6f70";  // 写入手表
+const TX  = "6e400003-b5a3-f393-e0a9-77656c6f6f70";  // 手表通知
+const CMD_SYNC_TIME = 140;        // 0x8C
+const TIME_EPOCH = 1388534400;    // 2014-01-01 UTC
+
+const logEl = document.getElementById('log');
+const btnSync = document.getElementById('btnSync');
+const btnDis  = document.getElementById('btnDisconnect');
+const statusEl = document.getElementById('status');
+let server = null, rxChar = null, txChar = null;
+let waitResp = null; // {resolve, timer}
+
+function log(msg, cls='i') {
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const ok  = m => log(m, 'ok');
+const err = m => log(m, 'e');
+const mut = m => log(m, 'm');
+const warn= m => log(m, 'w');
+
+function setStatus(on, txt) {
+  statusEl.textContent = txt;
+  statusEl.className = 'status ' + (on ? 'on' : 'off');
+}
+
+// 构造时间同步 payload (6 字节)
+function buildPayload(tzHours) {
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const ts = nowUnix - TIME_EPOCH;            // uint32
+  const tzMin = Math.round(tzHours * 60);
+  const tz30 = (Math.floor(tzMin / 30) & 0xFF);
+  const tz15 = (Math.floor(tzMin / 15) & 0xFF);
+  const buf = new ArrayBuffer(6);
+  const dv  = new DataView(buf);
+  dv.setUint32(0, ts >>> 0, true);           // 小端 4 字节时间戳（hey 3s 固件按小端解析）
+  dv.setUint8(4, tz30);
+  dv.setUint8(5, tz15);
+  return { buf: new Uint8Array(buf), nowUnix, ts, tzMin, tz30, tz15 };
+}
+
+// 构造一包: [cmd][seq=0][payload]
+function buildPacket(cmd, payload) {
+  const pkt = new Uint8Array(2 + payload.length);
+  pkt[0] = cmd & 0xFF;
+  pkt[1] = 0x00;
+  pkt.set(payload, 2);
+  return pkt;
+}
+
+function toHex(u8) {
+  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join(' ');
+}
+
+function parseResponse(data, expectedCmd) {
+  if (data.length < 2) { warn('返回包太短: ' + toHex(data)); return false; }
+  const cmd = data[0];
+  if (cmd !== expectedCmd) { warn(`命令号不匹配: 期望 ${expectedCmd}, 收到 ${cmd}`); return false; }
+  if (data.length >= 3) {
+    const r = data[2];
+    log(`[resp] cmd=${cmd} seq=${data[1]} result=${r}  (${r===1?'成功':'失败/未知'})`, r===1?'ok':'w');
+    return r === 1;
+  }
+  log(`[resp] cmd=${cmd} seq=${data[1]} (无 result 字段, 视为成功)`, 'i');
+  return true;
+}
+
+function handleNotification(event) {
+  const data = new Uint8Array(event.target.value.buffer);
+  log('[notify] 收到 ' + data.length + ' 字节: ' + toHex(data), 'i');
+  if (waitResp) {
+    clearTimeout(waitResp.timer);
+    const w = waitResp; waitResp = null;
+    w.resolve(data);
+  }
+}
+
+btnSync.onclick = async () => {
+  if (!navigator.bluetooth) {
+    err('此浏览器不支持 Web Bluetooth。请用 Chrome / Edge / Opera（安卓 Chrome 也行）。');
+    return;
+  }
+  const tz = parseFloat(document.getElementById('tz').value);
+  if (isNaN(tz)) { warn('时区填错了，用数字，如 8'); return; }
+
+  log('='.repeat(50), 'm');
+  log('开始连接 WeLoop Hey 3S ...', 'i');
+  const p = buildPayload(tz);
+  log(`[payload] unix=${p.nowUnix}  ts(减2014)=${p.ts}  tz_min=${p.tzMin}  tz30=${p.tz30}  tz15=${p.tz15}`, 'm');
+  const pkt = buildPacket(CMD_SYNC_TIME, p.buf);
+  log(`[packet] hex=${toHex(pkt)}  (${pkt.length} 字节)  cmd=${CMD_SYNC_TIME}`, 'm');
+
+  let device;
+  try {
+    // namePrefix 过滤: 只显示 WeLoop Hey 3S
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'WeLoop Hey 3S' }],
+      optionalServices: [SVC]
+    });
+    log('已选设备: ' + (device.name || '(无名)') + '  id=' + device.id, 'i');
+  } catch (e) {
+    if (e.name === 'NotFoundError') {
+      warn('选择框里没看到 Hey 3S？试试: 靠近手表 / 手表亮屏 / 系统蓝牙里取消已配对的 Hey 3S。');
+    } else {
+      err('选择设备失败: ' + e.message);
+    }
+    return;
+  }
+
+  try {
+    log('连接 GATT server ...', 'i');
+    server = await device.gatt.connect();
+    setStatus(true, '已连接');
+    device.addEventListener('gattserverdisconnected', () => {
+      setStatus(false, '已断开');
+      log('[event] 设备断开', 'w');
+      btnSync.disabled = false; btnDis.disabled = true;
+    });
+
+    log('获取 weloop service ...', 'i');
+    let svc;
+    try {
+      svc = await server.getPrimaryService(SVC);
+    } catch (e) {
+      err('未找到 weloop service ' + SVC);
+      err('可能设备不是 Hey 3S，或固件协议不同。');
+      return;
+    }
+
+    log('获取特征值 ...', 'i');
+    try { rxChar = await svc.getCharacteristic(RX); } catch(e) { err('获取写特征失败: ' + e.message); return; }
+    try { txChar = await svc.getCharacteristic(TX); } catch(e) { warn('获取通知特征失败: ' + e.message); }
+
+    // 订阅通知
+    if (txChar) {
+      try {
+        await txChar.startNotifications();
+        txChar.addEventListener('characteristicvaluechanged', handleNotification);
+        ok('已订阅通知 ' + TX);
+      } catch(e) { warn('订阅通知失败: ' + e.message + ' (继续, 部分表不回包)'); }
+    }
+
+    // 发送时间同步包
+    log('写入时间同步包 ...', 'i');
+    await rxChar.writeValueWithoutResponse(pkt);
+    ok('已写入 ' + pkt.length + ' 字节');
+
+    // 等待返回（最多 5 秒）
+    const resp = await new Promise(resolve => {
+      waitResp = { resolve, timer: setTimeout(() => { waitResp = null; resolve(null); }, 5000) };
+    });
+    if (resp) {
+      const success = parseResponse(resp, CMD_SYNC_TIME);
+      if (success) ok('\n✅ 时间同步成功！');
+      else warn('\n⚠️ 设备返回非成功，时间可能未同步。可断开重连后再试。');
+    } else {
+      warn('\n未收到返回包（5秒超时）。部分 weeloop 表写完即生效。');
+      log('请看手表时间是否已更新；若没变，断开手表蓝牙重连后再跑一次。', 'm');
+    }
+
+    btnSync.disabled = false; btnDis.disabled = false;
+  } catch (e) {
+    err('同步过程出错: ' + e.name + ' - ' + e.message);
+    if (/NetworkError|GATT/i.test(e.name)) warn('  GATT 操作失败: 设备可能已断开或不在范围。');
+  }
+};
+
+btnDis.onclick = () => {
+  if (server && server.connected) {
+    try { server.disconnect(); } catch(e){}
+    log('已主动断开', 'i');
+  }
+  setStatus(false, '未连接');
+  btnSync.disabled = false; btnDis.disabled = true;
+};
+
+mut('就绪。点击"连接并同步时间"开始。');
+mut('提示: 这台机器没蓝牙也能用——把此 HTML 拷到带蓝牙的电脑/手机用 Chrome 打开即可。');
+</script>
+</body>
+</html>
