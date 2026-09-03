@@ -11,7 +11,6 @@
 The official WeLoop app has long been shut down, leaving users unable to sync their watch time or log into cloud services.
 By reverse-engineering the official app, this project extracted the Hey 3S time sync protocol and extended BLE SDK commands into a pure HTML page (powered by the browser-native Web Bluetooth API).
 
-> 🔗 **Use Online Directly (No Download Required)**: https://micookie2.github.io/weloop-hey3s-time-sync/
 
 ---
 
@@ -65,15 +64,8 @@ By reverse-engineering the official app, this project extracted the Hey 3S time 
 | iOS / iPadOS | Any Browser | ❌ (Apple does not support Web Bluetooth) |
 | Any Platform | Safari, Firefox | ❌ |
 
-### Method 1: Online Version (Recommended & Easiest)
 
-Simply open the online version hosted on GitHub Pages in your browser—**no downloading or installation required**:
-
-> 🔗 **[https://micookie2.github.io/weloop-hey3s-time-sync/](https://micookie2.github.io/weloop-hey3s-time-sync/)**
-
-Once opened, follow the "Execution Steps" below. We recommend bookmarking this page for future time syncing.
-
-### Method 2: Local Execution (Offline / Backup if Online Version is Unavailable)
+### Method 1: Local Execution (Offline / Backup if Online Version is Unavailable)
 
 1. **Download** [index.html](https://www.google.com/search?q=./index.html) locally.
 2. **Unpair from System**: Go to your OS Bluetooth settings. If the Hey 3S is already paired, **unpair / forget the device** first (Web Bluetooth cannot connect to paired devices due to browser specification restrictions).
