@@ -1,4 +1,3 @@
-Here is the updated `README.md` incorporating the new features, experimental warnings, and protocol commands from the provided code.
 
 ---
 
