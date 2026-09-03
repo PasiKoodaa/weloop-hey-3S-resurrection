@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#121214">
 <title>WeLoop Hey 3S Protocol V2 Control Panel</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -12,21 +13,32 @@
     --txt:#f4f4f5; --mut:#a1a1aa; --acc:#3b82f6; --acc-h:#2563eb;
     --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --cyan:#06b6d4; --purple:#a855f7;
   }
-  * { box-sizing:border-box; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { touch-action:manipulation; }
   body {
-    margin:0; padding:20px; background:var(--bg); color:var(--txt);
+    margin:0; padding:16px; background:var(--bg); color:var(--txt);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     line-height:1.5; max-width:800px; margin:0 auto;
+    padding-bottom:calc(76px + env(safe-area-inset-bottom));
   }
-  h1 { font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  h1 { font-size:19px; margin:0 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .badge-v2 { background:#1e3a8a; color:#93c5fd; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
-  .sub { color:var(--mut); font-size:12px; margin-bottom:16px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:15px 18px; margin-bottom:14px; }
-  .card h2 { margin:0 0 10px; font-size:14px; color:var(--acc); font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .sub { color:var(--mut); font-size:12px; margin-bottom:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:2px 16px 14px; margin-bottom:12px; }
+  details.card > summary {
+    padding:12px 0 10px; cursor:pointer; list-style:none; user-select:none;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    font-size:14px; color:var(--acc); font-weight:600;
+  }
+  details.card > summary::-webkit-details-marker { display:none; }
+  details.card > summary::after { content:'▾'; color:var(--mut); margin-left:auto; transition:transform .15s; }
+  details.card[open] > summary::after { transform:rotate(180deg); }
+  details.card > summary .hleft { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+  .cbody { padding-top:4px; }
   button {
-    background:var(--acc); color:#fff; border:none; border-radius:6px;
-    padding:8px 12px; font-size:12px; cursor:pointer; font-weight:600;
-    transition:background .15s, opacity .15s;
+    background:var(--acc); color:#fff; border:none; border-radius:8px;
+    padding:10px 12px; font-size:12px; cursor:pointer; font-weight:600; min-height:40px;
+    transition:background .15s, opacity .15s; touch-action:manipulation;
   }
   button:hover { background:var(--acc-h); }
   button:disabled { background:#2a2a30; color:#666; cursor:not-allowed; opacity:.6; }
@@ -42,17 +54,18 @@
   label { display:block; font-size:11px; color:var(--mut); margin:8px 0 3px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
   input, select, textarea {
     width:100%; background:#141416; border:1px solid var(--border);
-    color:var(--txt); border-radius:6px; padding:7px 9px; font-size:13px;
+    color:var(--txt); border-radius:8px; padding:9px 10px; font-size:14px;
   }
-  textarea { font-family:"SF Mono",Consolas,Menlo,monospace; font-size:11px; resize:vertical; }
+  textarea { font-family:"SF Mono",Consolas,Menlo,monospace; font-size:12px; resize:vertical; }
   .log {
     background:#09090b; border:1px solid var(--border); border-radius:8px;
     padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace;
     font-size:11px; line-height:1.5; height:260px; overflow:auto;
     white-space:pre-wrap; word-break:break-all;
+    -webkit-overflow-scrolling:touch;
   }
   .log .i { color:#93c5fd; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
-  .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap; }
   .status.on { background:var(--ok); color:#052e16; }
   .status.off { background:#3f3f46; color:#d4d4d8; }
   .chip {
@@ -65,193 +78,255 @@
   .note { font-size:11px; color:var(--mut); margin-top:8px; }
   .sess-active { color:var(--ok); font-weight:600; }
   #hrChart { width:100%; height:140px; border:1px solid var(--border); border-radius:8px; display:block; }
+  #btnWake.active { background:var(--warn); color:#3b2503; border-color:var(--warn); }
+
+  /* ===== Bottom dock ===== */
+  #dock {
+    position:fixed; left:0; right:0; bottom:0; z-index:1100;
+    background:rgba(18,18,20,.94); backdrop-filter:blur(8px);
+    border-top:1px solid var(--border);
+    display:flex; gap:8px; align-items:center;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    max-width:800px; margin:0 auto;
+  }
+  #dock button { padding:6px 10px; min-height:36px; font-size:11px; flex:0 0 auto; }
+  #dock .spacer { flex:1; }
+  #dockBatt { font-size:11px; color:var(--mut); white-space:nowrap; }
+
+  /* ===== Phone layout ===== */
+  @media (max-width:620px) {
+    body { padding:10px; padding-bottom:calc(70px + env(safe-area-inset-bottom)); }
+    h1 { font-size:16px; }
+    .grid-3 { grid-template-columns:1fr; }
+    .card { padding:0 12px 12px; border-radius:10px; }
+    button { min-height:44px; font-size:13px; }
+    input, select { font-size:16px; } /* prevents zoom-on-focus */
+    .log { height:200px; font-size:10.5px; }
+    #map { height:300px; }
+    .row .row > * { flex:1; }
+    .chip { padding:3px 8px; font-size:10px; }
+  }
+  @media (max-width:380px) {
+    .grid-2 { grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
 
 <h1>⌚ WeLoop Hey 3S <span class="badge-v2">Native Protocol V2</span></h1>
-<div class="sub">Direct GATT framing <code>[CMD][SEQ][PAYLOAD]</code> from <code>com.yf.lib.bluetooth.b.c.b.r</code> — no H2DR wrappers, no checksum.</div>
+<div class="sub">Direct GATT framing <code>[CMD][SEQ][PAYLOAD]</code> · Android Chrome / Edge / Samsung Internet · HTTPS required for BLE</div>
 
 <!-- 1. Connection -->
-<div class="card">
-  <h2>
-    <span>Device Connection</span>
-    <div>
-      <span id="batteryBadge" style="font-size:11px; color:var(--mut); margin-right:8px;">Battery: --</span>
+<details class="card" open>
+  <summary>
+    <span class="hleft">🔗 Device Connection</span>
+    <span class="hleft">
+      <span id="batteryBadge" style="font-size:11px; color:var(--mut);">🔋 --</span>
       <span id="status" class="status off">Disconnected</span>
+    </span>
+  </summary>
+  <div class="cbody">
+    <div class="row">
+      <button id="btnConnect">🔗 Connect Hey 3S</button>
+      <button id="btnScanAll" class="ghost">📡 Scan All Devices</button>
     </div>
-  </h2>
-  <div class="row">
-    <button id="btnConnect">🔗 Connect Hey 3S</button>
-    <button id="btnDisconnect" class="ghost" disabled>Disconnect</button>
-    <button id="btnReadBattery" class="ghost" disabled>🔋 Read Battery</button>
+    <div class="row" style="margin-top:8px;">
+      <button id="btnDisconnect" class="ghost" disabled>Disconnect</button>
+      <button id="btnReadBattery" class="ghost" disabled>🔋 Read Battery</button>
+    </div>
+    <div class="note">Use "Scan All Devices" if the watch doesn't appear — some units advertise under non-standard names.</div>
   </div>
-</div>
+</details>
 
 <!-- 2. Time Sync (0x8C) -->
-<div class="card">
-  <h2>🕒 Clock Synchronization (Cmd 0x8C)</h2>
-  <div class="grid-2">
-    <div>
-      <label>Timezone Offset (Hours)</label>
-      <input type="number" id="tz" value="8" step="0.5">
-    </div>
-    <div>
-      <label>Hour Display Mode</label>
-      <select id="timeFormat">
-        <option value="1" selected>24-Hour Clock</option>
-        <option value="0">12-Hour Clock</option>
-      </select>
-    </div>
-  </div>
-  <div style="margin-top:10px;">
-    <button id="btnSyncTime" disabled>🕒 Sync Watch Time (0x8C)</button>
-  </div>
-</div>
-
-<!-- 3. Workout / GPS toggles -->
-<div class="card">
-  <h2>🏃 Workout &amp; GPS Mode (Cmd 0x98 / 0x9B)</h2>
-  <div class="grid-3">
-    <button id="btnWorkoutOn" class="purple" disabled>▶️ Start Workout/GPS</button>
-    <button id="btnWorkoutOff" class="ghost" disabled>⏹️ Stop Workout</button>
-    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query EPO (0x9B)</button>
-  </div>
-</div>
-
-<!-- 4. Heart Rate toggles -->
-<div class="card">
-  <h2>💓 Heart Rate Monitor (Cmd 0x97)</h2>
-  <div class="row">
-    <button id="btnHrOn" class="cyan" disabled>Enable Auto HR</button>
-    <button id="btnHrOff" class="ghost" disabled>Disable Auto HR</button>
-  </div>
-</div>
-
-<!-- 5. Sync Data Console (0x7C) -->
-<div class="card">
-  <h2>📡 Sync Data Console (Cmd 0x7C)</h2>
-  <div class="grid-3">
-    <button id="btnReqGps" class="ghost" disabled>🗺️ Request GPS Track (0x0E)</button>
-    <button id="btnReqHr" class="ghost" disabled>📈 Request HR Logs (0x06)</button>
-    <button id="btnReqSport" class="ghost" disabled>📊 Request Steps (0x05)</button>
-  </div>
-  <div class="row" style="margin-top:10px;">
-    <button id="btnFinishSession" class="cyan" disabled>Finish &amp; Process</button>
-    <button id="btnCancelSession" class="ghost" disabled>Cancel Capture</button>
-  </div>
-  <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-    <span class="chip" id="sessInfo">Session: idle</span>
-    <span class="chip" id="statsLine">TX 0 · RX 0 · 0 B</span>
-  </div>
-
-  <div class="grid-2" style="margin-top:12px;">
-    <div>
-      <label>Coordinate Scale (auto-detect fallback)</label>
-      <select id="gpsScale">
-        <option value="" selected>Auto (try 1e7 then 1e6)</option>
-        <option value="10000000">Degrees × 10⁷ (u-blox style)</option>
-        <option value="1000000">Degrees × 10⁶</option>
-      </select>
-    </div>
-    <div>
-      <label>Manual Hex Parse (offline)</label>
-      <div class="row">
-        <button id="btnParseHex" class="ghost no-gate">🧪 Parse Pasted Hex → Map</button>
-        <button id="btnClearTrack" class="ghost no-gate">Clear Map</button>
+<details class="card" open>
+  <summary><span class="hleft">🕒 Clock Synchronization (Cmd 0x8C)</span></summary>
+  <div class="cbody">
+    <div class="grid-2">
+      <div>
+        <label>Timezone Offset (Hours)</label>
+        <input type="number" id="tz" value="8" step="0.5">
+      </div>
+      <div>
+        <label>Hour Display Mode</label>
+        <select id="timeFormat">
+          <option value="1" selected>24-Hour Clock</option>
+          <option value="0">12-Hour Clock</option>
+        </select>
       </div>
     </div>
+    <div style="margin-top:10px;">
+      <button id="btnSyncTime" disabled style="width:100%;">🕒 Sync Watch Time (0x8C)</button>
+    </div>
   </div>
-  <textarea id="hexIn" rows="3" placeholder="Paste raw hex from a capture here (any separator ok), e.g. 0x7C 00 0E ... a1 86 4e 07 7d 3a 0c 07 ..." style="margin-top:10px;"></textarea>
+</details>
 
-  <div class="row" style="margin-top:10px;">
-    <button id="btnExportGpx" class="ghost no-gate" disabled>⬇ GPX</button>
-    <button id="btnExportCsv" class="ghost no-gate" disabled>⬇ CSV</button>
-    <button id="btnExportRaw" class="ghost no-gate" disabled>⬇ RAW .bin</button>
+<!-- 3. Workout / GPS -->
+<details class="card" open>
+  <summary><span class="hleft">🏃 Workout &amp; GPS Mode (0x98 / 0x9B)</span></summary>
+  <div class="cbody">
+    <div class="grid-3">
+      <button id="btnWorkoutOn" class="purple" disabled>▶️ Start Workout/GPS</button>
+      <button id="btnWorkoutOff" class="ghost" disabled>⏹️ Stop Workout</button>
+      <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query EPO (0x9B)</button>
+    </div>
   </div>
-  <div class="note">Parser scans the capture buffer for int32-LE lat/lon pairs (strict fixed-stride scan, then sliding-window fallback). If the track lands at 0,0 or in the ocean, switch the scale dropdown and re-parse with the hex box.</div>
-</div>
+</details>
+
+<!-- 4. Heart Rate -->
+<details class="card" open>
+  <summary><span class="hleft">💓 Heart Rate Monitor (Cmd 0x97)</span></summary>
+  <div class="cbody">
+    <div class="row">
+      <button id="btnHrOn" class="cyan" disabled>Enable Auto HR</button>
+      <button id="btnHrOff" class="ghost" disabled>Disable Auto HR</button>
+    </div>
+  </div>
+</details>
+
+<!-- 5. Sync Data Console -->
+<details class="card" open>
+  <summary><span class="hleft">📡 Sync Data Console (Cmd 0x7C)</span></summary>
+  <div class="cbody">
+    <div class="grid-3">
+      <button id="btnReqGps" class="ghost" disabled>🗺️ Request GPS Track (0x0E)</button>
+      <button id="btnReqHr" class="ghost" disabled>📈 Request HR Logs (0x06)</button>
+      <button id="btnReqSport" class="ghost" disabled>📊 Request Steps (0x05)</button>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnFinishSession" class="cyan" disabled>Finish &amp; Process</button>
+      <button id="btnCancelSession" class="ghost" disabled>Cancel Capture</button>
+    </div>
+    <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+      <span class="chip" id="sessInfo">Session: idle</span>
+      <span class="chip" id="statsLine">TX 0 · RX 0 · 0 B</span>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <label>Coordinate Scale</label>
+        <select id="gpsScale">
+          <option value="" selected>Auto (try 1e7 then 1e6)</option>
+          <option value="10000000">Degrees × 10⁷ (u-blox style)</option>
+          <option value="1000000">Degrees × 10⁶</option>
+        </select>
+      </div>
+      <div>
+        <label>Manual Hex Parse (offline)</label>
+        <div class="row">
+          <button id="btnParseHex" class="ghost no-gate">🧪 Hex → Map</button>
+          <button id="btnClearTrack" class="ghost no-gate">Clear Map</button>
+        </div>
+      </div>
+    </div>
+    <textarea id="hexIn" rows="3" placeholder="Paste raw hex from a capture here (any separator ok)..." style="margin-top:10px;"></textarea>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="btnExportGpx" class="ghost no-gate" disabled>⬇ GPX</button>
+      <button id="btnExportCsv" class="ghost no-gate" disabled>⬇ CSV</button>
+      <button id="btnExportRaw" class="ghost no-gate" disabled>⬇ RAW .bin</button>
+    </div>
+    <div class="note">Parser scans the buffer for int32-LE lat/lon pairs (strict stride scan, then sliding-window fallback). Wrong location? Try the other coordinate scale via manual hex parse. Files save to your Downloads folder.</div>
+  </div>
+</details>
 
 <!-- 6. GPS Map -->
-<div class="card">
-  <h2><span>🗺️ GPS Track Map</span><span class="chip" id="mapStats">No track loaded</span></h2>
-  <div id="map"></div>
-</div>
+<details class="card" open>
+  <summary><span class="hleft">🗺️ GPS Track Map</span><span class="chip" id="mapStats">No track</span></summary>
+  <div class="cbody">
+    <div id="map"></div>
+  </div>
+</details>
 
 <!-- 7. HR Chart -->
-<div class="card">
-  <h2><span>💓 Heart Rate Log Chart (0x7C / 0x06)</span><span class="chip" id="hrStats">--</span></h2>
-  <canvas id="hrChart"></canvas>
-</div>
+<details class="card">
+  <summary><span class="hleft">💓 HR Log Chart (0x7C / 0x06)</span><span class="chip" id="hrStats">--</span></summary>
+  <div class="cbody">
+    <canvas id="hrChart"></canvas>
+  </div>
+</details>
 
 <!-- 8. Settings -->
-<div class="card">
-  <h2>⚙️ Settings &amp; Device Controls (0x80, 0x81, 0x82, 0x88, 0x8D, 0x89)</h2>
-  <div class="grid-3">
-    <div>
-      <label>Raise-To-Wake (0x80)</label>
-      <div class="row">
-        <button id="btnGestureOn" class="ghost" disabled>On</button>
-        <button id="btnGestureOff" class="ghost" disabled>Off</button>
+<details class="card">
+  <summary><span class="hleft">⚙️ Settings &amp; Controls (0x80 · 0x81 · 0x82 · 0x88 · 0x8D · 0x89)</span></summary>
+  <div class="cbody">
+    <div class="grid-3">
+      <div>
+        <label>Raise-To-Wake (0x80)</label>
+        <div class="row">
+          <button id="btnGestureOn" class="ghost" disabled>On</button>
+          <button id="btnGestureOff" class="ghost" disabled>Off</button>
+        </div>
+      </div>
+      <div>
+        <label>Wear Hand (0x81)</label>
+        <div class="row">
+          <button id="btnWearLeft" class="ghost" disabled>Left</button>
+          <button id="btnWearRight" class="ghost" disabled>Right</button>
+        </div>
+      </div>
+      <div>
+        <label>Anti-Lost (0x88)</label>
+        <div class="row">
+          <button id="btnAntiLostOn" class="ghost" disabled>On</button>
+          <button id="btnAntiLostOff" class="ghost" disabled>Off</button>
+        </div>
       </div>
     </div>
-    <div>
-      <label>Wear Hand (0x81)</label>
-      <div class="row">
-        <button id="btnWearLeft" class="ghost" disabled>Left</button>
-        <button id="btnWearRight" class="ghost" disabled>Right</button>
-      </div>
-    </div>
-    <div>
-      <label>Anti-Lost Alert (0x88)</label>
-      <div class="row">
-        <button id="btnAntiLostOn" class="ghost" disabled>On</button>
-        <button id="btnAntiLostOff" class="ghost" disabled>Off</button>
-      </div>
-    </div>
-  </div>
 
-  <div class="grid-3" style="margin-top:12px;">
-    <div>
-      <label>Camera Mode (0x8D)</label>
-      <div class="row">
-        <button id="btnCameraOn" class="ghost" disabled>Open</button>
-        <button id="btnCameraOff" class="ghost" disabled>Exit</button>
+    <div class="grid-3" style="margin-top:12px;">
+      <div>
+        <label>Camera (0x8D)</label>
+        <div class="row">
+          <button id="btnCameraOn" class="ghost" disabled>Open</button>
+          <button id="btnCameraOff" class="ghost" disabled>Exit</button>
+        </div>
       </div>
-    </div>
-    <div>
-      <label>Backlight (0x7E)</label>
-      <div class="row">
-        <select id="backlightMode">
-          <option value="0">0 · Off</option>
-          <option value="1" selected>1 · Auto</option>
-          <option value="2">2 · High</option>
-          <option value="3">3 · Low</option>
-        </select>
-        <button id="btnBacklight" class="ghost" disabled>Apply</button>
+      <div>
+        <label>Backlight (0x7E)</label>
+        <div class="row">
+          <select id="backlightMode">
+            <option value="0">Off</option>
+            <option value="1" selected>Auto</option>
+            <option value="2">High</option>
+            <option value="3">Low</option>
+          </select>
+          <button id="btnBacklight" class="ghost" disabled>Set</button>
+        </div>
       </div>
-    </div>
-    <div>
-      <label>Sedentary (0x82) / Reboot (0x89)</label>
-      <div class="row">
-        <button id="btnSedOn" class="ghost" disabled>Sed On</button>
-        <button id="btnSedOff" class="ghost" disabled>Sed Off</button>
-        <button id="btnReboot" class="danger" disabled>♻️</button>
+      <div>
+        <label>Sedentary / Reboot</label>
+        <div class="row">
+          <button id="btnSedOn" class="ghost" disabled>Sed On</button>
+          <button id="btnSedOff" class="ghost" disabled>Sed Off</button>
+          <button id="btnReboot" class="danger" disabled>♻️</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</details>
 
 <!-- 9. Log -->
-<div class="card">
-  <h2>
-    <span>Activity Log</span>
-    <div class="row" style="gap:6px;">
-      <button id="btnSaveLog" class="ghost no-gate" style="padding:2px 8px; font-size:11px;">⬇ Save .txt</button>
-      <button id="btnClearLog" class="ghost no-gate" style="padding:2px 8px; font-size:11px;">Clear</button>
-    </div>
-  </h2>
-  <div id="log" class="log"></div>
+<details class="card" open>
+  <summary>
+    <span class="hleft">📜 Activity Log</span>
+    <span class="hleft" onclick="event.stopPropagation(); event.preventDefault();" style="gap:6px;">
+      <button id="btnSaveLog" class="ghost no-gate" style="padding:4px 8px; min-height:30px; font-size:11px;">⬇ Save</button>
+      <button id="btnClearLog" class="ghost no-gate" style="padding:4px 8px; min-height:30px; font-size:11px;">Clear</button>
+    </span>
+  </summary>
+  <div class="cbody">
+    <div id="log" class="log"></div>
+  </div>
+</details>
+
+<!-- Bottom dock -->
+<div id="dock">
+  <span id="dockStatus" class="status off">Off</span>
+  <span id="dockBatt">🔋 --</span>
+  <span class="spacer"></span>
+  <button id="btnWake" class="ghost">☀️ Awake</button>
+  <button id="btnTop" class="ghost">↑ Top</button>
 </div>
 
 <script>
@@ -262,9 +337,8 @@ const TX_CHAR    = "6e400003-b5a3-f393-e0a9-77656c6f6f70"; // Notify
 const SVC_BATT   = "0000180f-0000-1000-8000-00805f9b34fb";
 const CHAR_BATT  = "00002a19-0000-1000-8000-00805f9b34fb";
 
-// DOM
 const $ = id => document.getElementById(id);
-const logEl = $('log'), statusEl = $('status'), batteryBadge = $('batteryBadge');
+const logEl = $('log'), statusEl = $('status');
 
 let server = null, rxChar = null, txChar = null, battChar = null;
 
@@ -288,6 +362,7 @@ function toAscii(u8) { return Array.from(u8).map(b => (b>=32 && b<127) ? String.
 
  $('btnClearLog').onclick = () => { logEl.innerHTML = ''; };
  $('btnSaveLog').onclick = () => download(`weloop-log-${Date.now()}.txt`, logEl.innerText, 'text/plain');
+ $('btnTop').onclick = () => window.scrollTo({ top:0, behavior:'smooth' });
 
 function download(name, content, mime) {
   const a = document.createElement('a');
@@ -297,11 +372,36 @@ function download(name, content, mime) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-// ===== Stats / Session state =====
+// ===== Wake Lock (Android: keeps screen on during long syncs) =====
+let wakeLock = null, wakeDesired = false;
+async function setWake(desired, silent = false) {
+  wakeDesired = desired;
+  $('btnWake').classList.toggle('active', desired);
+  $('btnWake').textContent = desired ? '☀️ Awake ON' : '☀️ Awake';
+  if (desired && 'wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      if (!silent) ok('☀️ Screen wake lock held — phone won\'t sleep mid-sync.');
+    } catch(e) { warn(`Wake lock failed: ${e.message}`); }
+  } else if (!desired && wakeLock) {
+    try { await wakeLock.release(); } catch(e){}
+    wakeLock = null;
+    if (!silent) mut('Wake lock released.');
+  } else if (desired && !('wakeLock' in navigator) && !silent) {
+    warn('Wake Lock unsupported on this browser — keep the screen on manually during sync.');
+  }
+}
+document.addEventListener('visibilitychange', async () => {
+  // Wake lock auto-releases when the page is hidden; re-acquire on return.
+  if (document.visibilityState === 'visible' && wakeDesired && !wakeLock && 'wakeLock' in navigator) {
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+});
+ $('btnWake').onclick = () => setWake(!wakeDesired);
+
+// ===== Stats / Session =====
 const stats = { tx:0, rx:0, rxBytes:0 };
-let session = null;          // {type:'GPS'|'HR'|'SPORT', chunks:[], bytes:0}
-let currentTrack = [];       // [{lat,lon},...] last plotted
-let lastRaw = null;          // Uint8Array of last finished capture
+let session = null, currentTrack = [], lastRaw = null;
 
 function updateStats() {
   $('statsLine').innerHTML = `TX <b>${stats.tx}</b> · RX <b>${stats.rx}</b> · <b>${stats.rxBytes}</b> B`;
@@ -321,28 +421,34 @@ function updateSessionUi() {
   el.classList.add('sess-active');
   fin.disabled = false; can.disabled = false;
   fin.textContent = session.type === 'GPS' ? 'Finish GPS → Plot Map'
-                  : session.type === 'HR'  ? 'Finish HR → Draw Chart'
-                  : 'Finish Capture → Export RAW';
+                  : session.type === 'HR'  ? 'Finish HR → Chart'
+                  : 'Finish → Export RAW';
   reqs.forEach(b => b.disabled = true);
 }
 
+function setBattery(pct) {
+  $('batteryBadge').textContent = `🔋 ${pct}%`;
+  $('dockBatt').textContent = `🔋 ${pct}%`;
+}
 function setConnected(on) {
   statusEl.textContent = on ? 'Connected' : 'Disconnected';
   statusEl.className = 'status ' + (on ? 'on' : 'off');
+  $('dockStatus').textContent = on ? 'ON' : 'OFF';
+  $('dockStatus').className = 'status ' + (on ? 'on' : 'off');
   $('btnConnect').disabled = on;
+  $('btnScanAll').disabled = on;
   $('btnDisconnect').disabled = !on;
   $('btnReadBattery').disabled = !on;
-  document.querySelectorAll('.card button:not(#btnConnect):not(#btnDisconnect):not(#btnClearLog):not(.no-gate)')
+  document.querySelectorAll('.card button:not(#btnConnect):not(#btnScanAll):not(#btnClearLog):not(#btnSaveLog):not(.no-gate)')
     .forEach(b => b.disabled = !on);
   if (!on) {
-    batteryBadge.textContent = 'Battery: --';
+    setBattery('--');
     if (session) { warn('Sync session aborted (device lost).'); session = null; }
   }
   updateSessionUi();
 }
 
 // ===== V2 Frame Builder =====
-// Format: [CMD, SEQ=0x00, ...payload]
 function buildV2Packet(cmd, payloadArray = []) {
   const pkt = new Uint8Array(2 + payloadArray.length);
   pkt[0] = cmd & 0xFF;
@@ -350,22 +456,18 @@ function buildV2Packet(cmd, payloadArray = []) {
   if (payloadArray.length) pkt.set(payloadArray, 2);
   return pkt;
 }
-
-// Time Sync (Cmd 0x8C) — epoch offset 2014-01-01
 function buildTimePacket(tzHours, is24H = 1) {
-  const nowSec = Math.floor(Date.now() / 1000);
-  const ts = nowSec - 1388534400;
+  const ts = Math.floor(Date.now() / 1000) - 1388534400; // epoch 2014-01-01
   const tzMin = Math.round(tzHours * 60);
   const payload = new Uint8Array(7);
-  const dv = new DataView(payload.buffer);
-  dv.setUint32(0, ts >>> 0, true);
+  new DataView(payload.buffer).setUint32(0, ts >>> 0, true);
   payload[4] = Math.round(tzMin / 30) & 0xFF;
   payload[5] = Math.round(tzMin / 15) & 0xFF;
   payload[6] = is24H ? 1 : 0;
   return buildV2Packet(0x8C, payload);
 }
 
-// ===== Queued writes (prevents GATT busy errors) =====
+// ===== Queued writes =====
 let writeChain = Promise.resolve();
 async function sendPacket(bytes, label = '') {
   if (!rxChar) throw new Error('Not connected');
@@ -380,7 +482,7 @@ function queueWrite(bytes, label) {
   return writeChain;
 }
 
-// ===== Notification handler (rich RX logging) =====
+// ===== RX handler =====
 function handleNotification(event) {
   const data = new Uint8Array(event.target.value.buffer);
   stats.rx++; stats.rxBytes += data.length;
@@ -397,7 +499,7 @@ function handleNotification(event) {
       if (data.length <= 8) {
         log(`↳ 0x7C control frame: dataIndex=0x${res.toString(16).toUpperCase()}${data.length>3 ? ', extra: '+toHex(data.slice(3)) : ''}`, 'm');
         if (session && res === sessionCode(session.type))
-          log('↳ This may be an end-of-transfer marker — press "Finish & Process" if no more data arrives.', 'm');
+          log('↳ Possibly end-of-transfer marker — press "Finish & Process" if no more data arrives.', 'm');
       }
     } else if (res === 0x01) {
       ok(`✅ Watch ACK 0x${cmd.toString(16).toUpperCase()} — success.`);
@@ -414,12 +516,13 @@ function startSession(type) {
   session = { type, chunks: [], bytes: 0 };
   if (type === 'GPS') currentTrack = [];
   log(`📡 Capture session opened (${type}) — buffering incoming frames...`, 'i');
+  if (!wakeDesired) setWake(true); // auto keep-awake during sync
+  // Fold noisy cards on phone so the session chips stay visible
   updateSessionUi();
 }
 function ingestSession(u8) {
   if (session.bytes > 262144) { warn('Capture buffer full (256 KB) — auto-finishing.'); finishSession(); return; }
   let chunk = u8;
-  // Guess: [0x7C][SEQ][IDX] response header → strip 3 bytes; small frames are control acks, skip them
   if (u8[0] === 0x7C) {
     if (u8.length <= 8) { log('↳ (control frame not added to data buffer)', 'm'); return; }
     chunk = u8.subarray(3);
@@ -453,35 +556,34 @@ function finishSession() {
     const pts = extractGpsPoints(lastRaw, scale);
     if (pts.length >= 2) {
       plotTrack(pts);
-      ok(`🗺️ Plotted ${pts.length} GPS points from ${lastRaw.length} B. Export GPX/CSV below the map.`);
+      ok(`🗺️ Plotted ${pts.length} GPS points from ${lastRaw.length} B.`);
     } else {
-      warn('No plausible GPS coordinate pairs found. Paste the hex into the manual parser and try the other coordinate scale.');
+      warn('No plausible GPS coordinate pairs found. Use the manual hex parser and try the other scale.');
     }
   } else if (type === 'HR') {
     const { vals, layout } = detectHrValues(lastRaw);
     drawHrChart(vals);
-    $('hrStats').textContent = vals.length >= 2 ? `${vals.length} samples · layout: ${layout}` : 'no data';
-    if (vals.length >= 2) ok(`💓 Charted ${vals.length} HR samples (detected layout: ${layout}).`);
-    else warn('HR buffer had too few plausible values to chart. RAW export is available.');
+    $('hrStats').textContent = vals.length >= 2 ? `${vals.length} samples` : 'no data';
+    if (vals.length >= 2) ok(`💓 Charted ${vals.length} HR samples (layout: ${layout}).`);
+    else warn('HR buffer had too few plausible values to chart. RAW export available.');
   } else {
-    ok(`📊 ${lastRaw.length} B of sport data captured — use "⬇ RAW .bin" to save for analysis.`);
+    ok(`📊 ${lastRaw.length} B of sport data captured — save via "⬇ RAW .bin".`);
   }
   session = null;
   updateSessionUi();
 }
-
 function requestSync(dataIndex, label) {
   const type = dataIndex === 0x0E ? 'GPS' : dataIndex === 0x06 ? 'HR' : 'SPORT';
   startSession(type);
   queueWrite(buildV2Packet(0x7C, [dataIndex, 0x00, 0x00, 0x00, 0x00]), label);
 }
 
-// ===== GPS extraction heuristics =====
+// ===== GPS extraction =====
 function plausible(latI, lonI, scale) {
   const lat = latI / scale, lon = lonI / scale;
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
-  return Math.abs(latI) > 20000 || Math.abs(lonI) > 20000; // reject padding zeros
+  return Math.abs(latI) > 20000 || Math.abs(lonI) > 20000;
 }
 function scanStrict(u8, off, stride, scale) {
   const pts = [];
@@ -502,7 +604,7 @@ function scanLenient(u8, scale) {
   }
   return hits.filter((h, idx) => {
     const p = hits[idx-1], n = hits[idx+1];
-    return (p && h.i - p.i <= 24) || (n && n.i - h.i <= 24); // drop isolated false positives
+    return (p && h.i - p.i <= 24) || (n && n.i - h.i <= 24);
   }).map(h => ({ lat: h.lat, lon: h.lon }));
 }
 function extractGpsPoints(u8, forceScale = null) {
@@ -535,7 +637,7 @@ function initMap() {
   if (typeof L === 'undefined') { warn('Leaflet CDN unavailable — map disabled (GPX export still works).'); return; }
   map = L.map('map').setView([22.5431, 114.0579], 11);
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+    { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { maxZoom: 19, attribution: 'Tiles © Esri' });
   L.control.layers({ 'Street': osm, 'Satellite': sat }).addTo(map);
@@ -574,7 +676,7 @@ function plotTrack(pts, live = false) {
  $('btnClearTrack').onclick = () => {
   currentTrack = [];
   if (trackLayer && map) { map.removeLayer(trackLayer); trackLayer = null; }
-  $('mapStats').textContent = 'No track loaded';
+  $('mapStats').textContent = 'No track';
   $('btnExportGpx').disabled = $('btnExportCsv').disabled = true;
   mut('Map cleared.');
 };
@@ -586,18 +688,17 @@ function plotTrack(pts, live = false) {
   download(`weloop-track-${Date.now()}.gpx`,
     `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="WeLoop Hey 3S Web Panel">\n  <trk><name>Hey 3S Track</name><trkseg>\n${ptsXml}\n  </trkseg></trk>\n</gpx>`,
     'application/gpx+xml');
-  ok('GPX exported.');
+  ok('GPX exported to Downloads.');
 };
  $('btnExportCsv').onclick = () => {
   if (currentTrack.length < 2) return warn('No track to export.');
-  download(`weloop-track-${Date.now()}.csv`,
-    'lat,lon\n' + currentTrack.map(p => `${p.lat},${p.lon}`).join('\n'), 'text/csv');
-  ok('CSV exported.');
+  download(`weloop-track-${Date.now()}.csv`, 'lat,lon\n' + currentTrack.map(p => `${p.lat},${p.lon}`).join('\n'), 'text/csv');
+  ok('CSV exported to Downloads.');
 };
  $('btnExportRaw').onclick = () => {
   if (!lastRaw) return warn('No captured raw data yet.');
   download(`weloop-capture-${Date.now()}.bin`, lastRaw, 'application/octet-stream');
-  ok('RAW binary exported.');
+  ok('RAW binary exported to Downloads.');
 };
 
 // ===== Manual hex parser =====
@@ -610,15 +711,14 @@ function plotTrack(pts, live = false) {
   const pts = extractGpsPoints(u8, scale);
   if (pts.length >= 2) {
     plotTrack(pts);
-    ok(`🧪 Parsed ${pts.length} GPS points from ${u8.length} pasted bytes.`);
+    ok(`🧪 Parsed ${pts.length} GPS points from ${u8.length} bytes.`);
   } else {
     warn(`No plausible GPS pairs in ${u8.length} bytes — try the other coordinate scale.`);
   }
 };
 
-// ===== HR parsing + chart =====
+// ===== HR parse + chart =====
 function detectHrValues(u8) {
-  // Try common record layouts: [ts(4B)][hr(1B)] → stride 5; variants 6/7 etc.
   for (const [stride, off] of [[5,4],[6,4],[6,5],[7,5],[4,3],[3,2]]) {
     if (u8.length >= stride*4) {
       const vals = []; let good = 0, tot = 0;
@@ -639,7 +739,7 @@ function drawHrChart(vals) {
   ctx.fillStyle = '#09090b'; ctx.fillRect(0, 0, w, h);
   if (!vals || vals.length < 2) {
     ctx.fillStyle = '#666'; ctx.font = '12px sans-serif';
-    ctx.fillText('No HR data yet — run "Request HR Logs (0x06)" then "Finish HR → Draw Chart".', 10, h/2);
+    ctx.fillText('No HR data — run "Request HR Logs (0x06)" then "Finish HR → Chart".', 10, h/2);
     return;
   }
   const min = Math.min(...vals), max = Math.max(...vals);
@@ -661,20 +761,30 @@ function drawHrChart(vals) {
 }
 
 // ===== Bluetooth connection =====
- $('btnConnect').onclick = async () => {
-  if (!navigator.bluetooth) return err('Web Bluetooth not supported. Use Chrome or Edge.');
+async function doConnect(options, label) {
+  if (!navigator.bluetooth) {
+    err('Web Bluetooth unavailable. Use Chrome, Edge, or Samsung Internet on Android (not Firefox/iOS).');
+    return;
+  }
   try {
-    log('Scanning for WeLoop Hey 3S...', 'i');
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { namePrefix: 'WeLoop Hey 3S' },
-        { namePrefix: 'Hey 3S' },
-        { namePrefix: 'WeLoop' }
-      ],
-      optionalServices: [SVC_WELOOP, SVC_BATT]
-    });
-    log(`Device selected: ${device.name || 'Hey 3S'}`, 'i');
-    server = await device.gatt.connect();
+    log(`Scanning (${label})...`, 'i');
+    let device;
+    try {
+      device = await navigator.bluetooth.requestDevice(options);
+    } catch(e) {
+      if (e.name === 'NotFoundError') { mut('Scan cancelled.'); return; }
+      throw e;
+    }
+    log(`Device selected: ${device.name || '(unnamed)'}`, 'i');
+
+    // Android stacks occasionally fail the first connect — retry once.
+    try {
+      server = await device.gatt.connect();
+    } catch(e) {
+      warn(`First connect attempt failed (${e.message}) — retrying...`);
+      await new Promise(r => setTimeout(r, 500));
+      server = await device.gatt.connect();
+    }
     setConnected(true);
     device.addEventListener('gattserverdisconnected', () => { setConnected(false); warn('Device disconnected.'); });
 
@@ -688,71 +798,72 @@ function drawHrChart(vals) {
     try {
       const bSvc = await server.getPrimaryService(SVC_BATT);
       battChar = await bSvc.getCharacteristic(CHAR_BATT);
-      const pct = (await battChar.readValue()).getUint8(0);
-      batteryBadge.textContent = `Battery: ${pct}%`;
-      ok(`Battery: ${pct}%`);
+      setBattery((await battChar.readValue()).getUint8(0));
+      ok(`Battery: ${(await battChar.readValue()).getUint8(0)}%`);
     } catch(e){}
   } catch(e) {
     err(`Connection failed: ${e.message}`);
     setConnected(false);
   }
+}
+const FILTERED_OPTS = {
+  filters: [
+    { namePrefix: 'WeLoop Hey 3S' },
+    { namePrefix: 'Hey 3S' },
+    { namePrefix: 'WeLoop' }
+  ],
+  optionalServices: [SVC_WELOOP, SVC_BATT]
 };
+const ALL_OPTS = { acceptAllDevices: true, optionalServices: [SVC_WELOOP, SVC_BATT] };
+
+ $('btnConnect').onclick  = () => doConnect(FILTERED_OPTS, 'name-filtered');
+ $('btnScanAll').onclick  = () => doConnect(ALL_OPTS, 'all devices');
  $('btnDisconnect').onclick = () => { if (server && server.connected) server.disconnect(); setConnected(false); };
  $('btnReadBattery').onclick = async () => {
   if (!battChar) return;
-  const pct = (await battChar.readValue()).getUint8(0);
-  batteryBadge.textContent = `Battery: ${pct}%`;
-  ok(`Battery: ${pct}%`);
+  setBattery((await battChar.readValue()).getUint8(0));
+  ok(`Battery: ${(await battChar.readValue()).getUint8(0)}%`);
 };
 
-// ===== Time sync =====
- $('btnSyncTime').onclick = async () => {
+// ===== Commands =====
+ $('btnSyncTime').onclick = () => {
   const tz = parseFloat($('tz').value) || 8;
-  const is24H = parseInt($('timeFormat').value, 10);
-  queueWrite(buildTimePacket(tz, is24H), 'Time Sync (0x8C)');
+  queueWrite(buildTimePacket(tz, parseInt($('timeFormat').value, 10)), 'Time Sync (0x8C)');
 };
-
-// ===== Workout / GPS =====
- $('btnWorkoutOn').onclick = () => queueWrite(buildV2Packet(0x98, [0x01]), 'Start Workout/GPS (0x98 0x01)');
+ $('btnWorkoutOn').onclick  = () => queueWrite(buildV2Packet(0x98, [0x01]), 'Start Workout/GPS (0x98 0x01)');
  $('btnWorkoutOff').onclick = () => queueWrite(buildV2Packet(0x98, [0x00]), 'Stop Workout/GPS (0x98 0x00)');
- $('btnQueryEpo').onclick = () => queueWrite(buildV2Packet(0x9B), 'Query EPO Satellites (0x9B)');
-
-// ===== Sync console =====
- $('btnReqGps').onclick = () => requestSync(0x0E, 'Request GPS Track (0x7C/0x0E)');
- $('btnReqHr').onclick = () => requestSync(0x06, 'Request HR Logs (0x7C/0x06)');
+ $('btnQueryEpo').onclick   = () => queueWrite(buildV2Packet(0x9B), 'Query EPO (0x9B)');
+ $('btnReqGps').onclick   = () => requestSync(0x0E, 'Request GPS Track (0x7C/0x0E)');
+ $('btnReqHr').onclick    = () => requestSync(0x06, 'Request HR Logs (0x7C/0x06)');
  $('btnReqSport').onclick = () => requestSync(0x05, 'Request Sport Logs (0x7C/0x05)');
  $('btnFinishSession').onclick = finishSession;
  $('btnCancelSession').onclick = cancelSession;
-
-// ===== HR toggle =====
- $('btnHrOn').onclick = () => queueWrite(buildV2Packet(0x97, [0x01]), 'Enable Continuous HR (0x97 0x01)');
- $('btnHrOff').onclick = () => queueWrite(buildV2Packet(0x97, [0x00]), 'Disable Continuous HR (0x97 0x00)');
-
-// ===== Settings =====
- $('btnGestureOn').onclick = () => queueWrite(buildV2Packet(0x80, [0x01]), 'Raise-to-Wake ON (0x80 0x01)');
- $('btnGestureOff').onclick = () => queueWrite(buildV2Packet(0x80, [0x00]), 'Raise-to-Wake OFF (0x80 0x00)');
- $('btnWearLeft').onclick = () => queueWrite(buildV2Packet(0x81, [0x00]), 'Wear Left (0x81 0x00)');
- $('btnWearRight').onclick = () => queueWrite(buildV2Packet(0x81, [0x01]), 'Wear Right (0x81 0x01)');
- $('btnAntiLostOn').onclick = () => queueWrite(buildV2Packet(0x88, [0x01]), 'Anti-Lost ON (0x88 0x01)');
- $('btnAntiLostOff').onclick = () => queueWrite(buildV2Packet(0x88, [0x00]), 'Anti-Lost OFF (0x88 0x00)');
- $('btnSedOn').onclick = () => queueWrite(buildV2Packet(0x82, [0x01]), 'Sedentary Alert ON (0x82 0x01)');
- $('btnSedOff').onclick = () => queueWrite(buildV2Packet(0x82, [0x00]), 'Sedentary Alert OFF (0x82 0x00)');
- $('btnCameraOn').onclick = () => queueWrite(buildV2Packet(0x8D, [0x01]), 'Camera Screen ON (0x8D 0x01)');
- $('btnCameraOff').onclick = () => queueWrite(buildV2Packet(0x8D, [0x00]), 'Camera Screen OFF (0x8D 0x00)');
+ $('btnHrOn').onclick  = () => queueWrite(buildV2Packet(0x97, [0x01]), 'Enable Auto HR (0x97 0x01)');
+ $('btnHrOff').onclick = () => queueWrite(buildV2Packet(0x97, [0x00]), 'Disable Auto HR (0x97 0x00)');
+ $('btnGestureOn').onclick  = () => queueWrite(buildV2Packet(0x80, [0x01]), 'Raise-to-Wake ON (0x80)');
+ $('btnGestureOff').onclick = () => queueWrite(buildV2Packet(0x80, [0x00]), 'Raise-to-Wake OFF (0x80)');
+ $('btnWearLeft').onclick   = () => queueWrite(buildV2Packet(0x81, [0x00]), 'Wear Left (0x81)');
+ $('btnWearRight').onclick  = () => queueWrite(buildV2Packet(0x81, [0x01]), 'Wear Right (0x81)');
+ $('btnAntiLostOn').onclick  = () => queueWrite(buildV2Packet(0x88, [0x01]), 'Anti-Lost ON (0x88)');
+ $('btnAntiLostOff').onclick = () => queueWrite(buildV2Packet(0x88, [0x00]), 'Anti-Lost OFF (0x88)');
+ $('btnSedOn').onclick  = () => queueWrite(buildV2Packet(0x82, [0x01]), 'Sedentary ON (0x82)');
+ $('btnSedOff').onclick = () => queueWrite(buildV2Packet(0x82, [0x00]), 'Sedentary OFF (0x82)');
+ $('btnCameraOn').onclick  = () => queueWrite(buildV2Packet(0x8D, [0x01]), 'Camera ON (0x8D)');
+ $('btnCameraOff').onclick = () => queueWrite(buildV2Packet(0x8D, [0x00]), 'Camera OFF (0x8D)');
  $('btnBacklight').onclick = () => {
   const m = parseInt($('backlightMode').value, 10);
-  queueWrite(buildV2Packet(0x7E, [m]), `Backlight Mode ${m} (0x7E)`);
+  queueWrite(buildV2Packet(0x7E, [m]), `Backlight ${m} (0x7E)`);
 };
  $('btnReboot').onclick = async () => {
   if (!confirm('Reboot the Hey 3S now?')) return;
-  await queueWrite(buildV2Packet(0x89, [0x00]), 'Reboot (0x89 0x00)');
+  await queueWrite(buildV2Packet(0x89, [0x00]), 'Reboot (0x89)');
   ok('Dispatched reboot command.');
 };
 
 // ===== Init =====
 initMap();
 drawHrChart([]);
-mut('Ready. Connect the watch, then use "Sync Data Console" to pull GPS/HR/step data. GPS captures auto-plot on the map; export GPX/CSV when happy.');
+mut('Android ready. First scan will trigger the "Nearby devices" permission prompt — allow it.');
 </script>
 </body>
 </html>
