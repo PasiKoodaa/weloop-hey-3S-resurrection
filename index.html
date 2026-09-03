@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WeLoop Hey 3S Protocol V2 Control Panel</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root {
     --bg:#121214; --card:#1c1c20; --border:#2e2e34;
@@ -38,28 +40,39 @@
   .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
   label { display:block; font-size:11px; color:var(--mut); margin:8px 0 3px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
-  input, select {
+  input, select, textarea {
     width:100%; background:#141416; border:1px solid var(--border);
     color:var(--txt); border-radius:6px; padding:7px 9px; font-size:13px;
   }
+  textarea { font-family:"SF Mono",Consolas,Menlo,monospace; font-size:11px; resize:vertical; }
   .log {
     background:#09090b; border:1px solid var(--border); border-radius:8px;
     padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace;
-    font-size:11px; line-height:1.5; height:220px; overflow:auto;
+    font-size:11px; line-height:1.5; height:260px; overflow:auto;
     white-space:pre-wrap; word-break:break-all;
   }
   .log .i { color:#93c5fd; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
   .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
   .status.on { background:var(--ok); color:#052e16; }
   .status.off { background:#3f3f46; color:#d4d4d8; }
+  .chip {
+    display:inline-block; background:#09090b; border:1px solid var(--border);
+    border-radius:6px; padding:4px 10px; font-size:11px; color:var(--mut);
+    font-family:"SF Mono",Consolas,Menlo,monospace;
+  }
+  .chip b { color:var(--txt); }
+  #map { height:340px; border-radius:8px; border:1px solid var(--border); background:#09090b; z-index:0; }
+  .note { font-size:11px; color:var(--mut); margin-top:8px; }
+  .sess-active { color:var(--ok); font-weight:600; }
+  #hrChart { width:100%; height:140px; border:1px solid var(--border); border-radius:8px; display:block; }
 </style>
 </head>
 <body>
 
 <h1>⌚ WeLoop Hey 3S <span class="badge-v2">Native Protocol V2</span></h1>
-<div class="sub">Uses exact byte layouts from <code>com.yf.lib.bluetooth.b.c.b.r</code> (Direct GATT Framing, no legacy H2DR wrappers).</div>
+<div class="sub">Direct GATT framing <code>[CMD][SEQ][PAYLOAD]</code> from <code>com.yf.lib.bluetooth.b.c.b.r</code> — no H2DR wrappers, no checksum.</div>
 
-<!-- 1. Connection Card -->
+<!-- 1. Connection -->
 <div class="card">
   <h2>
     <span>Device Connection</span>
@@ -75,7 +88,7 @@
   </div>
 </div>
 
-<!-- 2. Time Synchronization (0x8C) -->
+<!-- 2. Time Sync (0x8C) -->
 <div class="card">
   <h2>🕒 Clock Synchronization (Cmd 0x8C)</h2>
   <div class="grid-2">
@@ -96,33 +109,84 @@
   </div>
 </div>
 
-<!-- 3. Workout Tracking & GPS (0x98, 0x9B, 0x7C/0x0E) -->
+<!-- 3. Workout / GPS toggles -->
 <div class="card">
-  <h2>🏃 Workout & GPS Tracking (Cmd 0x98 / 0x9B / 0x7C)</h2>
+  <h2>🏃 Workout &amp; GPS Mode (Cmd 0x98 / 0x9B)</h2>
   <div class="grid-3">
-    <button id="btnWorkoutOn" class="purple" disabled>▶️ Start Workout/GPS (0x98 On)</button>
-    <button id="btnWorkoutOff" class="ghost" disabled>⏹️ Stop Workout (0x98 Off)</button>
-    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query EPO Satellites (0x9B)</button>
+    <button id="btnWorkoutOn" class="purple" disabled>▶️ Start Workout/GPS</button>
+    <button id="btnWorkoutOff" class="ghost" disabled>⏹️ Stop Workout</button>
+    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query EPO (0x9B)</button>
+  </div>
+</div>
+
+<!-- 4. Heart Rate toggles -->
+<div class="card">
+  <h2>💓 Heart Rate Monitor (Cmd 0x97)</h2>
+  <div class="row">
+    <button id="btnHrOn" class="cyan" disabled>Enable Auto HR</button>
+    <button id="btnHrOff" class="ghost" disabled>Disable Auto HR</button>
+  </div>
+</div>
+
+<!-- 5. Sync Data Console (0x7C) -->
+<div class="card">
+  <h2>📡 Sync Data Console (Cmd 0x7C)</h2>
+  <div class="grid-3">
+    <button id="btnReqGps" class="ghost" disabled>🗺️ Request GPS Track (0x0E)</button>
+    <button id="btnReqHr" class="ghost" disabled>📈 Request HR Logs (0x06)</button>
+    <button id="btnReqSport" class="ghost" disabled>📊 Request Steps (0x05)</button>
   </div>
   <div class="row" style="margin-top:10px;">
-    <button id="btnSyncGpsTrack" class="ghost" disabled>🗺️ Sync GPS Track Coordinates (0x7C/0x0E)</button>
-    <button id="btnSyncSportData" class="ghost" disabled>📊 Sync Historical Steps (0x7C/0x05)</button>
+    <button id="btnFinishSession" class="cyan" disabled>Finish &amp; Process</button>
+    <button id="btnCancelSession" class="ghost" disabled>Cancel Capture</button>
   </div>
+  <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+    <span class="chip" id="sessInfo">Session: idle</span>
+    <span class="chip" id="statsLine">TX 0 · RX 0 · 0 B</span>
+  </div>
+
+  <div class="grid-2" style="margin-top:12px;">
+    <div>
+      <label>Coordinate Scale (auto-detect fallback)</label>
+      <select id="gpsScale">
+        <option value="" selected>Auto (try 1e7 then 1e6)</option>
+        <option value="10000000">Degrees × 10⁷ (u-blox style)</option>
+        <option value="1000000">Degrees × 10⁶</option>
+      </select>
+    </div>
+    <div>
+      <label>Manual Hex Parse (offline)</label>
+      <div class="row">
+        <button id="btnParseHex" class="ghost no-gate">🧪 Parse Pasted Hex → Map</button>
+        <button id="btnClearTrack" class="ghost no-gate">Clear Map</button>
+      </div>
+    </div>
+  </div>
+  <textarea id="hexIn" rows="3" placeholder="Paste raw hex from a capture here (any separator ok), e.g. 0x7C 00 0E ... a1 86 4e 07 7d 3a 0c 07 ..." style="margin-top:10px;"></textarea>
+
+  <div class="row" style="margin-top:10px;">
+    <button id="btnExportGpx" class="ghost no-gate" disabled>⬇ GPX</button>
+    <button id="btnExportCsv" class="ghost no-gate" disabled>⬇ CSV</button>
+    <button id="btnExportRaw" class="ghost no-gate" disabled>⬇ RAW .bin</button>
+  </div>
+  <div class="note">Parser scans the capture buffer for int32-LE lat/lon pairs (strict fixed-stride scan, then sliding-window fallback). If the track lands at 0,0 or in the ocean, switch the scale dropdown and re-parse with the hex box.</div>
 </div>
 
-<!-- 4. Heart Rate Monitor (0x97, 0x7C/0x06) -->
+<!-- 6. GPS Map -->
 <div class="card">
-  <h2>💓 Heart Rate Monitor (Cmd 0x97 / 0x7C)</h2>
-  <div class="grid-3">
-    <button id="btnHrOn" class="cyan" disabled>Enable Auto HR (0x97 On)</button>
-    <button id="btnHrOff" class="ghost" disabled>Disable Auto HR (0x97 Off)</button>
-    <button id="btnSyncHrLogs" class="ghost" disabled>📈 Download HR Logs (0x7C/0x06)</button>
-  </div>
+  <h2><span>🗺️ GPS Track Map</span><span class="chip" id="mapStats">No track loaded</span></h2>
+  <div id="map"></div>
 </div>
 
-<!-- 5. Watch Settings & Controls -->
+<!-- 7. HR Chart -->
 <div class="card">
-  <h2>⚙️ Settings & Device Controls (0x80, 0x81, 0x88, 0x8D, 0x89)</h2>
+  <h2><span>💓 Heart Rate Log Chart (0x7C / 0x06)</span><span class="chip" id="hrStats">--</span></h2>
+  <canvas id="hrChart"></canvas>
+</div>
+
+<!-- 8. Settings -->
+<div class="card">
+  <h2>⚙️ Settings &amp; Device Controls (0x80, 0x81, 0x82, 0x88, 0x8D, 0x89)</h2>
   <div class="grid-3">
     <div>
       <label>Raise-To-Wake (0x80)</label>
@@ -147,26 +211,45 @@
     </div>
   </div>
 
-  <div class="grid-2" style="margin-top:12px;">
+  <div class="grid-3" style="margin-top:12px;">
     <div>
-      <label>Remote Camera Mode (0x8D)</label>
+      <label>Camera Mode (0x8D)</label>
       <div class="row">
-        <button id="btnCameraOn" class="ghost" disabled>Open Camera Screen</button>
+        <button id="btnCameraOn" class="ghost" disabled>Open</button>
         <button id="btnCameraOff" class="ghost" disabled>Exit</button>
       </div>
     </div>
     <div>
-      <label>Device Maintenance (0x89)</label>
-      <button id="btnReboot" class="danger" style="width:100%;" disabled>⚠️ Reboot Watch (0x89)</button>
+      <label>Backlight (0x7E)</label>
+      <div class="row">
+        <select id="backlightMode">
+          <option value="0">0 · Off</option>
+          <option value="1" selected>1 · Auto</option>
+          <option value="2">2 · High</option>
+          <option value="3">3 · Low</option>
+        </select>
+        <button id="btnBacklight" class="ghost" disabled>Apply</button>
+      </div>
+    </div>
+    <div>
+      <label>Sedentary (0x82) / Reboot (0x89)</label>
+      <div class="row">
+        <button id="btnSedOn" class="ghost" disabled>Sed On</button>
+        <button id="btnSedOff" class="ghost" disabled>Sed Off</button>
+        <button id="btnReboot" class="danger" disabled>♻️</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- 6. Activity Log -->
+<!-- 9. Log -->
 <div class="card">
   <h2>
     <span>Activity Log</span>
-    <button id="btnClearLog" class="ghost" style="padding:2px 8px; font-size:11px;">Clear</button>
+    <div class="row" style="gap:6px;">
+      <button id="btnSaveLog" class="ghost no-gate" style="padding:2px 8px; font-size:11px;">⬇ Save .txt</button>
+      <button id="btnClearLog" class="ghost no-gate" style="padding:2px 8px; font-size:11px;">Clear</button>
+    </div>
   </h2>
   <div id="log" class="log"></div>
 </div>
@@ -180,103 +263,406 @@ const SVC_BATT   = "0000180f-0000-1000-8000-00805f9b34fb";
 const CHAR_BATT  = "00002a19-0000-1000-8000-00805f9b34fb";
 
 // DOM
-const logEl        = document.getElementById('log');
-const statusEl     = document.getElementById('status');
-const batteryBadge = document.getElementById('batteryBadge');
-const btnConnect   = document.getElementById('btnConnect');
-const btnDisconnect= document.getElementById('btnDisconnect');
-const btnReadBattery = document.getElementById('btnReadBattery');
-const btnClearLog  = document.getElementById('btnClearLog');
+const $ = id => document.getElementById(id);
+const logEl = $('log'), statusEl = $('status'), batteryBadge = $('batteryBadge');
 
 let server = null, rxChar = null, txChar = null, battChar = null;
 
+// ===== Logging =====
+function tsNow() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
 function log(msg, cls='i') {
   const span = document.createElement('span');
   span.className = cls;
-  span.textContent = msg + '\n';
+  span.textContent = `[${tsNow()}] ${msg}\n`;
   logEl.appendChild(span);
+  if (logEl.childElementCount > 1200) logEl.removeChild(logEl.firstChild);
   logEl.scrollTop = logEl.scrollHeight;
 }
-const ok   = m => log(m, 'ok');
-const err  = m => log(m, 'e');
-const mut  = m => log(m, 'm');
-const warn = m => log(m, 'w');
+const ok = m => log(m,'ok'), err = m => log(m,'e'), mut = m => log(m,'m'), warn = m => log(m,'w');
 
-function toHex(u8) {
-  return Array.from(u8).map(b => b.toString(16).padStart(2, '0')).join(' ');
+function toHex(u8) { return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join(' '); }
+function toAscii(u8) { return Array.from(u8).map(b => (b>=32 && b<127) ? String.fromCharCode(b) : '·').join(''); }
+
+ $('btnClearLog').onclick = () => { logEl.innerHTML = ''; };
+ $('btnSaveLog').onclick = () => download(`weloop-log-${Date.now()}.txt`, logEl.innerText, 'text/plain');
+
+function download(name, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type:mime}));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-btnClearLog.onclick = () => { logEl.innerHTML = ''; };
+// ===== Stats / Session state =====
+const stats = { tx:0, rx:0, rxBytes:0 };
+let session = null;          // {type:'GPS'|'HR'|'SPORT', chunks:[], bytes:0}
+let currentTrack = [];       // [{lat,lon},...] last plotted
+let lastRaw = null;          // Uint8Array of last finished capture
+
+function updateStats() {
+  $('statsLine').innerHTML = `TX <b>${stats.tx}</b> · RX <b>${stats.rx}</b> · <b>${stats.rxBytes}</b> B`;
+}
+function updateSessionUi() {
+  const el = $('sessInfo'), fin = $('btnFinishSession'), can = $('btnCancelSession');
+  const reqs = ['btnReqGps','btnReqHr','btnReqSport'].map($);
+  if (!session) {
+    el.innerHTML = 'Session: idle';
+    el.classList.remove('sess-active');
+    fin.disabled = true; can.disabled = true;
+    reqs.forEach(b => b.disabled = !rxChar);
+    return;
+  }
+  const extra = session.type === 'GPS' && currentTrack.length ? ` · <b>${currentTrack.length}</b> pts` : '';
+  el.innerHTML = `Session: <b>${session.type}</b> · <b>${session.bytes}</b> B${extra}`;
+  el.classList.add('sess-active');
+  fin.disabled = false; can.disabled = false;
+  fin.textContent = session.type === 'GPS' ? 'Finish GPS → Plot Map'
+                  : session.type === 'HR'  ? 'Finish HR → Draw Chart'
+                  : 'Finish Capture → Export RAW';
+  reqs.forEach(b => b.disabled = true);
+}
 
 function setConnected(on) {
   statusEl.textContent = on ? 'Connected' : 'Disconnected';
   statusEl.className = 'status ' + (on ? 'on' : 'off');
-  btnConnect.disabled = on;
-  btnDisconnect.disabled = !on;
-  btnReadBattery.disabled = !on;
-
-  const actionButtons = document.querySelectorAll('.card button:not(#btnConnect):not(#btnDisconnect):not(#btnClearLog)');
-  actionButtons.forEach(b => b.disabled = !on);
-  if (!on) batteryBadge.textContent = 'Battery: --';
+  $('btnConnect').disabled = on;
+  $('btnDisconnect').disabled = !on;
+  $('btnReadBattery').disabled = !on;
+  document.querySelectorAll('.card button:not(#btnConnect):not(#btnDisconnect):not(#btnClearLog):not(.no-gate)')
+    .forEach(b => b.disabled = !on);
+  if (!on) {
+    batteryBadge.textContent = 'Battery: --';
+    if (session) { warn('Sync session aborted (device lost).'); session = null; }
+  }
+  updateSessionUi();
 }
 
-// ===== Native Protocol V2 Frame Builder =====
+// ===== V2 Frame Builder =====
 // Format: [CMD, SEQ=0x00, ...payload]
 function buildV2Packet(cmd, payloadArray = []) {
   const pkt = new Uint8Array(2 + payloadArray.length);
   pkt[0] = cmd & 0xFF;
-  pkt[1] = 0x00; // SEQ
-  if (payloadArray.length > 0) {
-    pkt.set(payloadArray, 2);
-  }
+  pkt[1] = 0x00;
+  if (payloadArray.length) pkt.set(payloadArray, 2);
   return pkt;
 }
 
-// 1. Time Sync (r.smali a(ag) - Cmd 0x8C)
+// Time Sync (Cmd 0x8C) — epoch offset 2014-01-01
 function buildTimePacket(tzHours, is24H = 1) {
   const nowSec = Math.floor(Date.now() / 1000);
-  const ts = nowSec - 1388534400; // Epoch: 2014-01-01 UTC (p.smali a())
+  const ts = nowSec - 1388534400;
   const tzMin = Math.round(tzHours * 60);
-  const tz30 = Math.round(tzMin / 30) & 0xFF;
-  const tz15 = Math.round(tzMin / 15) & 0xFF;
-
   const payload = new Uint8Array(7);
   const dv = new DataView(payload.buffer);
-  dv.setUint32(0, ts >>> 0, true); // Little-Endian 4-byte timestamp
-  payload[4] = tz30;
-  payload[5] = tz15;
+  dv.setUint32(0, ts >>> 0, true);
+  payload[4] = Math.round(tzMin / 30) & 0xFF;
+  payload[5] = Math.round(tzMin / 15) & 0xFF;
   payload[6] = is24H ? 1 : 0;
-
   return buildV2Packet(0x8C, payload);
 }
 
-// Send helper
+// ===== Queued writes (prevents GATT busy errors) =====
+let writeChain = Promise.resolve();
 async function sendPacket(bytes, label = '') {
   if (!rxChar) throw new Error('Not connected');
-  log(`[TX] ${label} (${bytes.length}B): ${toHex(bytes)}`, 'm');
-  await rxChar.writeValueWithoutResponse(bytes);
+  log(`⬆ TX ${label} (${bytes.length}B): ${toHex(bytes)}`, 'm');
+  stats.tx++; updateStats();
+  if (rxChar.writeValueWithoutResponse) await rxChar.writeValueWithoutResponse(bytes);
+  else await rxChar.writeValue(bytes);
+}
+function queueWrite(bytes, label) {
+  writeChain = writeChain.then(() => sendPacket(bytes, label))
+                         .catch(e => err(`Write failed: ${e.message}`));
+  return writeChain;
 }
 
-// Incoming notifications
+// ===== Notification handler (rich RX logging) =====
 function handleNotification(event) {
   const data = new Uint8Array(event.target.value.buffer);
-  log(`[RX] Received (${data.length}B): ${toHex(data)}`, 'i');
+  stats.rx++; stats.rxBytes += data.length;
+
+  const asc = toAscii(data);
+  const hasText = /[A-Za-z0-9]{3}/.test(asc.replace(/·/g,''));
+  log(`⬇ RX ${data.length}B: ${toHex(data)}${hasText ? `  │ "${asc}"` : ''}`, 'i');
+
+  if (session) ingestSession(data);
 
   if (data.length >= 3) {
-    const cmd = data[0];
-    const seq = data[1];
-    const res = data[2];
-    if (res === 1) ok(`✅ Watch acknowledged command 0x${cmd.toString(16).toUpperCase()} (Success).`);
-    else if (res === 0) warn(`⚠️ Watch returned code 0 for command 0x${cmd.toString(16).toUpperCase()}.`);
+    const cmd = data[0], res = data[2];
+    if (cmd === 0x7C) {
+      if (data.length <= 8) {
+        log(`↳ 0x7C control frame: dataIndex=0x${res.toString(16).toUpperCase()}${data.length>3 ? ', extra: '+toHex(data.slice(3)) : ''}`, 'm');
+        if (session && res === sessionCode(session.type))
+          log('↳ This may be an end-of-transfer marker — press "Finish & Process" if no more data arrives.', 'm');
+      }
+    } else if (res === 0x01) {
+      ok(`✅ Watch ACK 0x${cmd.toString(16).toUpperCase()} — success.`);
+    } else if (res === 0x00) {
+      warn(`⚠️ Watch returned 0 for command 0x${cmd.toString(16).toUpperCase()}.`);
+    }
   }
+  updateStats();
+}
+const sessionCode = t => t==='GPS' ? 0x0E : t==='HR' ? 0x06 : 0x05;
+
+// ===== Capture session =====
+function startSession(type) {
+  session = { type, chunks: [], bytes: 0 };
+  if (type === 'GPS') currentTrack = [];
+  log(`📡 Capture session opened (${type}) — buffering incoming frames...`, 'i');
+  updateSessionUi();
+}
+function ingestSession(u8) {
+  if (session.bytes > 262144) { warn('Capture buffer full (256 KB) — auto-finishing.'); finishSession(); return; }
+  let chunk = u8;
+  // Guess: [0x7C][SEQ][IDX] response header → strip 3 bytes; small frames are control acks, skip them
+  if (u8[0] === 0x7C) {
+    if (u8.length <= 8) { log('↳ (control frame not added to data buffer)', 'm'); return; }
+    chunk = u8.subarray(3);
+  }
+  session.chunks.push(chunk);
+  session.bytes += chunk.length;
+  if (session.type === 'GPS') liveExtractGps();
+  updateSessionUi();
+}
+function concatChunks(chunks) {
+  let len = 0; chunks.forEach(c => len += c.length);
+  const out = new Uint8Array(len);
+  let o = 0; chunks.forEach(c => { out.set(c, o); o += c.length; });
+  return out;
+}
+function cancelSession() {
+  if (!session) return;
+  warn(`Capture cancelled — discarded ${session.bytes} B.`);
+  session = null;
+  updateSessionUi();
+}
+function finishSession() {
+  if (!session) return;
+  const type = session.type;
+  lastRaw = concatChunks(session.chunks);
+  $('btnExportRaw').disabled = false;
+  log(`📦 Capture complete: ${lastRaw.length} B buffered for ${type}.`, 'i');
+
+  if (type === 'GPS') {
+    const scale = parseFloat($('gpsScale').value) || null;
+    const pts = extractGpsPoints(lastRaw, scale);
+    if (pts.length >= 2) {
+      plotTrack(pts);
+      ok(`🗺️ Plotted ${pts.length} GPS points from ${lastRaw.length} B. Export GPX/CSV below the map.`);
+    } else {
+      warn('No plausible GPS coordinate pairs found. Paste the hex into the manual parser and try the other coordinate scale.');
+    }
+  } else if (type === 'HR') {
+    const { vals, layout } = detectHrValues(lastRaw);
+    drawHrChart(vals);
+    $('hrStats').textContent = vals.length >= 2 ? `${vals.length} samples · layout: ${layout}` : 'no data';
+    if (vals.length >= 2) ok(`💓 Charted ${vals.length} HR samples (detected layout: ${layout}).`);
+    else warn('HR buffer had too few plausible values to chart. RAW export is available.');
+  } else {
+    ok(`📊 ${lastRaw.length} B of sport data captured — use "⬇ RAW .bin" to save for analysis.`);
+  }
+  session = null;
+  updateSessionUi();
 }
 
-// ===== Bluetooth Connection =====
-btnConnect.onclick = async () => {
-  if (!navigator.bluetooth) {
-    err('Web Bluetooth not supported. Use Chrome or Edge.');
+function requestSync(dataIndex, label) {
+  const type = dataIndex === 0x0E ? 'GPS' : dataIndex === 0x06 ? 'HR' : 'SPORT';
+  startSession(type);
+  queueWrite(buildV2Packet(0x7C, [dataIndex, 0x00, 0x00, 0x00, 0x00]), label);
+}
+
+// ===== GPS extraction heuristics =====
+function plausible(latI, lonI, scale) {
+  const lat = latI / scale, lon = lonI / scale;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
+  return Math.abs(latI) > 20000 || Math.abs(lonI) > 20000; // reject padding zeros
+}
+function scanStrict(u8, off, stride, scale) {
+  const pts = [];
+  for (let i = off; i + 8 <= u8.length; i += stride) {
+    const dv = new DataView(u8.buffer, u8.byteOffset + i, 8);
+    const a = dv.getInt32(0, true), b = dv.getInt32(4, true);
+    if (!plausible(a, b, scale)) return null;
+    pts.push({ lat: a/scale, lon: b/scale });
+  }
+  return pts.length >= 2 ? pts : null;
+}
+function scanLenient(u8, scale) {
+  const hits = [];
+  for (let i = 0; i + 8 <= u8.length; i += 4) {
+    const dv = new DataView(u8.buffer, u8.byteOffset + i, 8);
+    const a = dv.getInt32(0, true), b = dv.getInt32(4, true);
+    if (plausible(a, b, scale)) { hits.push({ i, lat: a/scale, lon: b/scale }); i += 8; }
+  }
+  return hits.filter((h, idx) => {
+    const p = hits[idx-1], n = hits[idx+1];
+    return (p && h.i - p.i <= 24) || (n && n.i - h.i <= 24); // drop isolated false positives
+  }).map(h => ({ lat: h.lat, lon: h.lon }));
+}
+function extractGpsPoints(u8, forceScale = null) {
+  const scales = forceScale ? [forceScale] : [1e7, 1e6];
+  let best = [];
+  for (const scale of scales) {
+    const s = scanLenient(u8, scale);
+    if (s.length > best.length) best = s;
+    if (best.length >= 64) break;
+    for (let off = 0; off < 4; off++) {
+      for (const stride of [8, 12, 16, 20, 24, 28, 32]) {
+        const pts = scanStrict(u8, off, stride, scale);
+        if (pts && pts.length > best.length) best = pts;
+      }
+    }
+    if (best.length >= 64) break;
+  }
+  return best;
+}
+function liveExtractGps() {
+  if (!session || session.bytes < 16) return;
+  const scale = parseFloat($('gpsScale').value) || null;
+  const pts = extractGpsPoints(concatChunks(session.chunks), scale);
+  if (pts.length >= 2) plotTrack(pts, true);
+}
+
+// ===== Leaflet map =====
+let map = null, trackLayer = null;
+function initMap() {
+  if (typeof L === 'undefined') { warn('Leaflet CDN unavailable — map disabled (GPX export still works).'); return; }
+  map = L.map('map').setView([22.5431, 114.0579], 11);
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: 'Tiles © Esri' });
+  L.control.layers({ 'Street': osm, 'Satellite': sat }).addTo(map);
+}
+function distKm(a, b) {
+  const R = 6371, d = Math.PI/180;
+  const dLat = (b.lat - a.lat)*d, dLon = (b.lon - a.lon)*d;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*d)*Math.cos(b.lat*d)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function plotTrack(pts, live = false) {
+  currentTrack = pts;
+  $('btnExportGpx').disabled = false;
+  $('btnExportCsv').disabled = false;
+  if (!map) return;
+  if (trackLayer) map.removeLayer(trackLayer);
+  trackLayer = L.layerGroup().addTo(map);
+  const ll = pts.map(p => [p.lat, p.lon]);
+  trackLayer.addLayer(L.polyline(ll, { color:'#3b82f6', weight:3, opacity:.85 }));
+  const step = Math.max(1, Math.ceil(pts.length/200));
+  pts.forEach((p, i) => {
+    if (i % step !== 0 && i !== 0 && i !== pts.length-1) return;
+    trackLayer.addLayer(
+      L.circleMarker(ll[i], { radius:3, color:'#fff', weight:1, fillOpacity:1,
+        fillColor: i===0 ? '#22c55e' : i===pts.length-1 ? '#ef4444' : '#3b82f6' })
+      .bindPopup(`#${i+1}<br>${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`)
+    );
+  });
+  trackLayer.addLayer(L.circleMarker(ll[0], { radius:7, color:'#22c55e', fillColor:'#22c55e', fillOpacity:.9 }).bindPopup('▶ Start'));
+  trackLayer.addLayer(L.circleMarker(ll[ll.length-1], { radius:7, color:'#ef4444', fillColor:'#ef4444', fillOpacity:.9 }).bindPopup('■ End'));
+  map.fitBounds(L.latLngBounds(ll).pad(0.2));
+  let d = 0; for (let i = 1; i < pts.length; i++) d += distKm(pts[i-1], pts[i]);
+  $('mapStats').innerHTML = `${live?'(live) ':''}<b>${pts.length}</b> pts · <b>${d.toFixed(2)}</b> km`;
+  updateSessionUi();
+}
+ $('btnClearTrack').onclick = () => {
+  currentTrack = [];
+  if (trackLayer && map) { map.removeLayer(trackLayer); trackLayer = null; }
+  $('mapStats').textContent = 'No track loaded';
+  $('btnExportGpx').disabled = $('btnExportCsv').disabled = true;
+  mut('Map cleared.');
+};
+
+// ===== Exports =====
+ $('btnExportGpx').onclick = () => {
+  if (currentTrack.length < 2) return warn('No track to export.');
+  const ptsXml = currentTrack.map(p => `    <trkpt lat="${p.lat}" lon="${p.lon}"/>`).join('\n');
+  download(`weloop-track-${Date.now()}.gpx`,
+    `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="WeLoop Hey 3S Web Panel">\n  <trk><name>Hey 3S Track</name><trkseg>\n${ptsXml}\n  </trkseg></trk>\n</gpx>`,
+    'application/gpx+xml');
+  ok('GPX exported.');
+};
+ $('btnExportCsv').onclick = () => {
+  if (currentTrack.length < 2) return warn('No track to export.');
+  download(`weloop-track-${Date.now()}.csv`,
+    'lat,lon\n' + currentTrack.map(p => `${p.lat},${p.lon}`).join('\n'), 'text/csv');
+  ok('CSV exported.');
+};
+ $('btnExportRaw').onclick = () => {
+  if (!lastRaw) return warn('No captured raw data yet.');
+  download(`weloop-capture-${Date.now()}.bin`, lastRaw, 'application/octet-stream');
+  ok('RAW binary exported.');
+};
+
+// ===== Manual hex parser =====
+ $('btnParseHex').onclick = () => {
+  const clean = $('hexIn').value.replace(/[^0-9a-fA-F]/g, '');
+  if (clean.length < 16) return err('Paste at least 8 bytes of hex.');
+  const u8 = new Uint8Array(Math.floor(clean.length/2));
+  for (let i = 0; i < u8.length; i++) u8[i] = parseInt(clean.substr(i*2, 2), 16);
+  const scale = parseFloat($('gpsScale').value) || null;
+  const pts = extractGpsPoints(u8, scale);
+  if (pts.length >= 2) {
+    plotTrack(pts);
+    ok(`🧪 Parsed ${pts.length} GPS points from ${u8.length} pasted bytes.`);
+  } else {
+    warn(`No plausible GPS pairs in ${u8.length} bytes — try the other coordinate scale.`);
+  }
+};
+
+// ===== HR parsing + chart =====
+function detectHrValues(u8) {
+  // Try common record layouts: [ts(4B)][hr(1B)] → stride 5; variants 6/7 etc.
+  for (const [stride, off] of [[5,4],[6,4],[6,5],[7,5],[4,3],[3,2]]) {
+    if (u8.length >= stride*4) {
+      const vals = []; let good = 0, tot = 0;
+      for (let i = off; i < u8.length; i += stride) { tot++; const v = u8[i]; if (v>=30 && v<=230) { good++; vals.push(v); } }
+      if (tot >= 4 && vals.length >= 4 && good/tot >= 0.8) return { vals, layout: `stride=${stride},off=${off}` };
+    }
+  }
+  const vals = [];
+  for (const v of u8) if (v >= 30 && v <= 230) vals.push(v);
+  return { vals, layout: 'filtered bytes' };
+}
+function drawHrChart(vals) {
+  const c = $('hrChart'), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 600, h = 140;
+  c.width = w*dpr; c.height = h*dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#09090b'; ctx.fillRect(0, 0, w, h);
+  if (!vals || vals.length < 2) {
+    ctx.fillStyle = '#666'; ctx.font = '12px sans-serif';
+    ctx.fillText('No HR data yet — run "Request HR Logs (0x06)" then "Finish HR → Draw Chart".', 10, h/2);
     return;
   }
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const lo = Math.max(0, min-10), hi = Math.min(240, max+10);
+  const X = i => 10 + (w-20)*i/(vals.length-1);
+  const Y = v => h-20 - (h-40)*(v-lo)/(hi-lo);
+  ctx.strokeStyle = '#26262b'; ctx.beginPath();
+  for (const g of [lo, (lo+hi)/2, hi]) { ctx.moveTo(10, Y(g)); ctx.lineTo(w-10, Y(g)); }
+  ctx.stroke();
+  ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.beginPath();
+  vals.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(0), Y(v)));
+  ctx.stroke();
+  const avg = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  ctx.fillStyle = '#a1a1aa'; ctx.font = '11px monospace';
+  ctx.fillText(`max ${max}`, w-70, 12);
+  ctx.fillText(`min ${min}`, w-70, h-6);
+  ctx.fillStyle = '#f4f4f5';
+  ctx.fillText(`avg ${avg} bpm · ${vals.length} samples`, 12, 14);
+}
+
+// ===== Bluetooth connection =====
+ $('btnConnect').onclick = async () => {
+  if (!navigator.bluetooth) return err('Web Bluetooth not supported. Use Chrome or Edge.');
   try {
     log('Scanning for WeLoop Hey 3S...', 'i');
     const device = await navigator.bluetooth.requestDevice({
@@ -287,29 +673,22 @@ btnConnect.onclick = async () => {
       ],
       optionalServices: [SVC_WELOOP, SVC_BATT]
     });
-
     log(`Device selected: ${device.name || 'Hey 3S'}`, 'i');
     server = await device.gatt.connect();
     setConnected(true);
-
-    device.addEventListener('gattserverdisconnected', () => {
-      setConnected(false);
-      warn('Device disconnected.');
-    });
+    device.addEventListener('gattserverdisconnected', () => { setConnected(false); warn('Device disconnected.'); });
 
     const svc = await server.getPrimaryService(SVC_WELOOP);
     rxChar = await svc.getCharacteristic(RX_CHAR);
     txChar = await svc.getCharacteristic(TX_CHAR);
     await txChar.startNotifications();
     txChar.addEventListener('characteristicvaluechanged', handleNotification);
-    ok('Connected and subscribed to Hey 3S notifications.');
+    ok('Connected — subscribed to notifications.');
 
-    // Battery
     try {
       const bSvc = await server.getPrimaryService(SVC_BATT);
       battChar = await bSvc.getCharacteristic(CHAR_BATT);
-      const val = await battChar.readValue();
-      const pct = val.getUint8(0);
+      const pct = (await battChar.readValue()).getUint8(0);
       batteryBadge.textContent = `Battery: ${pct}%`;
       ok(`Battery: ${pct}%`);
     } catch(e){}
@@ -318,119 +697,62 @@ btnConnect.onclick = async () => {
     setConnected(false);
   }
 };
-
-btnDisconnect.onclick = () => {
-  if (server && server.connected) server.disconnect();
-  setConnected(false);
-};
-
-btnReadBattery.onclick = async () => {
+ $('btnDisconnect').onclick = () => { if (server && server.connected) server.disconnect(); setConnected(false); };
+ $('btnReadBattery').onclick = async () => {
   if (!battChar) return;
-  const val = await battChar.readValue();
-  const pct = val.getUint8(0);
+  const pct = (await battChar.readValue()).getUint8(0);
   batteryBadge.textContent = `Battery: ${pct}%`;
   ok(`Battery: ${pct}%`);
 };
 
-// ===== 1. Time Synchronization (0x8C) =====
-document.getElementById('btnSyncTime').onclick = async () => {
-  const tz = parseFloat(document.getElementById('tz').value) || 8;
-  const is24H = parseInt(document.getElementById('timeFormat').value, 10);
-  const pkt = buildTimePacket(tz, is24H);
-  await sendPacket(pkt, 'Time Sync (0x8C)');
+// ===== Time sync =====
+ $('btnSyncTime').onclick = async () => {
+  const tz = parseFloat($('tz').value) || 8;
+  const is24H = parseInt($('timeFormat').value, 10);
+  queueWrite(buildTimePacket(tz, is24H), 'Time Sync (0x8C)');
 };
 
-// ===== 2. Workout Tracking & GPS (0x98, 0x9B, 0x7C) =====
-// Cmd 0x98: r.smali f(Z)
-document.getElementById('btnWorkoutOn').onclick = async () => {
-  const pkt = buildV2Packet(0x98, [0x01]);
-  await sendPacket(pkt, 'Start Workout / GPS Tracking (0x98 0x01)');
-  ok('Workout mode started on watch.');
-};
-document.getElementById('btnWorkoutOff').onclick = async () => {
-  const pkt = buildV2Packet(0x98, [0x00]);
-  await sendPacket(pkt, 'Stop Workout / GPS Tracking (0x98 0x00)');
-  ok('Workout mode stopped.');
-};
+// ===== Workout / GPS =====
+ $('btnWorkoutOn').onclick = () => queueWrite(buildV2Packet(0x98, [0x01]), 'Start Workout/GPS (0x98 0x01)');
+ $('btnWorkoutOff').onclick = () => queueWrite(buildV2Packet(0x98, [0x00]), 'Stop Workout/GPS (0x98 0x00)');
+ $('btnQueryEpo').onclick = () => queueWrite(buildV2Packet(0x9B), 'Query EPO Satellites (0x9B)');
 
-// Cmd 0x9B: i.smali
-document.getElementById('btnQueryEpo').onclick = async () => {
-  const pkt = buildV2Packet(0x9B, []);
-  await sendPacket(pkt, 'Query GPS Satellite EPO Status (0x9B)');
-};
+// ===== Sync console =====
+ $('btnReqGps').onclick = () => requestSync(0x0E, 'Request GPS Track (0x7C/0x0E)');
+ $('btnReqHr').onclick = () => requestSync(0x06, 'Request HR Logs (0x7C/0x06)');
+ $('btnReqSport').onclick = () => requestSync(0x05, 'Request Sport Logs (0x7C/0x05)');
+ $('btnFinishSession').onclick = finishSession;
+ $('btnCancelSession').onclick = cancelSession;
 
-// Cmd 0x7C / 0x0E: GPS Track Point Sync
-document.getElementById('btnSyncGpsTrack').onclick = async () => {
-  const pkt = buildV2Packet(0x7C, [0x0E, 0x00, 0x00, 0x00, 0x00]);
-  await sendPacket(pkt, 'Request GPS Route Download (0x7C / 0x0E)');
-};
+// ===== HR toggle =====
+ $('btnHrOn').onclick = () => queueWrite(buildV2Packet(0x97, [0x01]), 'Enable Continuous HR (0x97 0x01)');
+ $('btnHrOff').onclick = () => queueWrite(buildV2Packet(0x97, [0x00]), 'Disable Continuous HR (0x97 0x00)');
 
-// Cmd 0x7C / 0x05: Historical Sport Logs Sync
-document.getElementById('btnSyncSportData').onclick = async () => {
-  const pkt = buildV2Packet(0x7C, [0x05, 0x00, 0x00, 0x00, 0x00]);
-  await sendPacket(pkt, 'Request Historical Step Logs (0x7C / 0x05)');
+// ===== Settings =====
+ $('btnGestureOn').onclick = () => queueWrite(buildV2Packet(0x80, [0x01]), 'Raise-to-Wake ON (0x80 0x01)');
+ $('btnGestureOff').onclick = () => queueWrite(buildV2Packet(0x80, [0x00]), 'Raise-to-Wake OFF (0x80 0x00)');
+ $('btnWearLeft').onclick = () => queueWrite(buildV2Packet(0x81, [0x00]), 'Wear Left (0x81 0x00)');
+ $('btnWearRight').onclick = () => queueWrite(buildV2Packet(0x81, [0x01]), 'Wear Right (0x81 0x01)');
+ $('btnAntiLostOn').onclick = () => queueWrite(buildV2Packet(0x88, [0x01]), 'Anti-Lost ON (0x88 0x01)');
+ $('btnAntiLostOff').onclick = () => queueWrite(buildV2Packet(0x88, [0x00]), 'Anti-Lost OFF (0x88 0x00)');
+ $('btnSedOn').onclick = () => queueWrite(buildV2Packet(0x82, [0x01]), 'Sedentary Alert ON (0x82 0x01)');
+ $('btnSedOff').onclick = () => queueWrite(buildV2Packet(0x82, [0x00]), 'Sedentary Alert OFF (0x82 0x00)');
+ $('btnCameraOn').onclick = () => queueWrite(buildV2Packet(0x8D, [0x01]), 'Camera Screen ON (0x8D 0x01)');
+ $('btnCameraOff').onclick = () => queueWrite(buildV2Packet(0x8D, [0x00]), 'Camera Screen OFF (0x8D 0x00)');
+ $('btnBacklight').onclick = () => {
+  const m = parseInt($('backlightMode').value, 10);
+  queueWrite(buildV2Packet(0x7E, [m]), `Backlight Mode ${m} (0x7E)`);
 };
-
-// ===== 3. Continuous Heart Rate (0x97, 0x7C/0x06) =====
-// Cmd 0x97: r.smali g(Z)
-document.getElementById('btnHrOn').onclick = async () => {
-  const pkt = buildV2Packet(0x97, [0x01]);
-  await sendPacket(pkt, 'Enable Continuous Heart Rate (0x97 0x01)');
-  ok('Continuous Heart Rate turned ON.');
-};
-document.getElementById('btnHrOff').onclick = async () => {
-  const pkt = buildV2Packet(0x97, [0x00]);
-  await sendPacket(pkt, 'Disable Continuous Heart Rate (0x97 0x00)');
-  ok('Continuous Heart Rate turned OFF.');
-};
-
-// Cmd 0x7C / 0x06: Dynamic HR History
-document.getElementById('btnSyncHrLogs').onclick = async () => {
-  const pkt = buildV2Packet(0x7C, [0x06, 0x00, 0x00, 0x00, 0x00]);
-  await sendPacket(pkt, 'Download Dynamic HR History (0x7C / 0x06)');
-};
-
-// ===== 4. Device Settings =====
-// Gesture Light (r.smali d(Z) - 0x80)
-document.getElementById('btnGestureOn').onclick = async () => {
-  await sendPacket(buildV2Packet(0x80, [0x01]), 'Raise-to-Wake ON (0x80 0x01)');
-};
-document.getElementById('btnGestureOff').onclick = async () => {
-  await sendPacket(buildV2Packet(0x80, [0x00]), 'Raise-to-Wake OFF (0x80 0x00)');
-};
-
-// Wear Mode (r.smali e(Z) - 0x81)
-document.getElementById('btnWearLeft').onclick = async () => {
-  await sendPacket(buildV2Packet(0x81, [0x00]), 'Wear Left Hand (0x81 0x00)');
-};
-document.getElementById('btnWearRight').onclick = async () => {
-  await sendPacket(buildV2Packet(0x81, [0x01]), 'Wear Right Hand (0x81 0x01)');
-};
-
-// Anti-Lost (r.smali c(Z) - 0x88)
-document.getElementById('btnAntiLostOn').onclick = async () => {
-  await sendPacket(buildV2Packet(0x88, [0x01]), 'Anti-Lost ON (0x88 0x01)');
-};
-document.getElementById('btnAntiLostOff').onclick = async () => {
-  await sendPacket(buildV2Packet(0x88, [0x00]), 'Anti-Lost OFF (0x88 0x00)');
-};
-
-// Camera Screen (r.smali a(Z) - 0x8D)
-document.getElementById('btnCameraOn').onclick = async () => {
-  await sendPacket(buildV2Packet(0x8D, [0x01]), 'Open Camera Screen (0x8D 0x01)');
-};
-document.getElementById('btnCameraOff').onclick = async () => {
-  await sendPacket(buildV2Packet(0x8D, [0x00]), 'Exit Camera Screen (0x8D 0x00)');
-};
-
-// Reboot Watch (r.smali b(Z) - 0x89)
-document.getElementById('btnReboot').onclick = async () => {
+ $('btnReboot').onclick = async () => {
   if (!confirm('Reboot the Hey 3S now?')) return;
-  await sendPacket(buildV2Packet(0x89, [0x00]), 'Watch Reboot (0x89 0x00)');
+  await queueWrite(buildV2Packet(0x89, [0x00]), 'Reboot (0x89 0x00)');
   ok('Dispatched reboot command.');
 };
 
-mut('Ready. Open in Chrome or Edge and connect your Hey 3S.');
+// ===== Init =====
+initMap();
+drawHrChart([]);
+mut('Ready. Connect the watch, then use "Sync Data Console" to pull GPS/HR/step data. GPS captures auto-plot on the map; export GPX/CSV when happy.');
 </script>
 </body>
 </html>
