@@ -1,99 +1,265 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WeLoop Hey 3S 时间同步</title>
+<title>WeLoop Swiss Knife (Sport, GPS & Control)</title>
 <style>
-  :root { --bg:#1a1a1a; --card:#262626; --border:#3a3a3a; --txt:#e0e0e0; --mut:#888; --acc:#4a9eff; --ok:#4caf50; --warn:#ff9800; --err:#f44336; }
+  :root {
+    --bg:#121212; --card:#1e1e1e; --card-alt:#252525; --border:#333; 
+    --txt:#e4e4e7; --mut:#a1a1aa; --acc:#3b82f6; --acc-h:#2563eb;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --cyan:#06b6d4; --purple:#a855f7;
+  }
   * { box-sizing:border-box; }
-  body { margin:0; padding:24px; background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.6; max-width:720px; margin:0 auto; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .sub { color:var(--mut); font-size:13px; margin-bottom:20px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:14px; }
-  .card h2 { margin:0 0 10px; font-size:15px; color:var(--acc); font-weight:600; }
-  button { background:var(--acc); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; width:100%; transition:opacity .15s; font-weight:600; }
-  button:hover { opacity:.88; }
-  button:disabled { background:#555; cursor:not-allowed; opacity:.6; }
+  body {
+    margin:0; padding:20px; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; max-width:800px; margin:0 auto;
+  }
+  h1 { font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .sub { color:var(--mut); font-size:12px; margin-bottom:16px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:15px 18px; margin-bottom:14px; }
+  .card h2 { margin:0 0 10px; font-size:14px; color:var(--acc); font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  button {
+    background:var(--acc); color:#fff; border:none; border-radius:6px;
+    padding:8px 12px; font-size:12px; cursor:pointer; font-weight:600;
+    transition:background .15s, opacity .15s;
+  }
+  button:hover { background:var(--acc-h); }
+  button:disabled { background:#3a3a3a; color:#777; cursor:not-allowed; opacity:.6; }
   button.ghost { background:transparent; border:1px solid var(--border); color:var(--txt); }
-  .row { display:flex; gap:10px; }
+  button.ghost:hover { background:#2a2a2a; }
+  button.cyan { background:var(--cyan); color:#083344; }
+  button.cyan:hover { opacity:.9; }
+  button.purple { background:var(--purple); color:#fff; }
+  button.purple:hover { opacity:.9; }
+  button.danger { background:var(--err); color:#fff; }
+  button.danger:hover { opacity:.9; }
+  .row { display:flex; gap:8px; align-items:center; }
   .row > * { flex:1; }
-  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
-  input, select { width:100%; background:#1f1f1f; border:1px solid var(--border); color:var(--txt); border-radius:6px; padding:8px 10px; font-size:14px; }
-  .log { background:#111; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:12px; line-height:1.5; height:280px; overflow:auto; white-space:pre-wrap; word-break:break-all; }
-  .log .i { color:#9cdcfe; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
-  .status { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; background:#3a3a3a; }
-  .status.on { background:var(--ok); color:#fff; }
-  .status.off { background:#555; color:#ccc; }
-  .note { font-size:12px; color:var(--mut); margin-top:8px; }
-  .note a { color:var(--acc); }
-  details { margin-top:10px; }
-  details summary { cursor:pointer; color:var(--mut); font-size:13px; }
-  details pre { background:#111; padding:10px; border-radius:6px; overflow:auto; font-size:11px; color:#bbb; margin-top:8px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .grid-4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  label { display:block; font-size:11px; color:var(--mut); margin:8px 0 3px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+  input, select {
+    width:100%; background:#171717; border:1px solid var(--border);
+    color:var(--txt); border-radius:6px; padding:7px 9px; font-size:13px;
+  }
+  .stat-box { background:var(--card-alt); border:1px solid var(--border); border-radius:6px; padding:8px 10px; text-align:center; }
+  .stat-val { font-size:16px; font-weight:700; color:var(--txt); }
+  .stat-lbl { font-size:10px; color:var(--mut); text-transform:uppercase; }
+  .log {
+    background:#0a0a0a; border:1px solid var(--border); border-radius:8px;
+    padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace;
+    font-size:11px; line-height:1.5; height:220px; overflow:auto;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .log .i { color:#93c5fd; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
+  .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .status.on { background:var(--ok); color:#052e16; }
+  .status.off { background:#444; color:#ccc; }
+  details { margin-top:8px; }
+  details summary { cursor:pointer; color:var(--mut); font-size:12px; }
+  details pre { background:#0a0a0a; padding:10px; border-radius:6px; overflow:auto; font-size:11px; color:#bbb; margin-top:6px; border:1px solid #222; }
 </style>
 </head>
 <body>
 
-<h1>WeLoop Hey 3S 时间同步</h1>
-<div class="sub">基于 Web Bluetooth，协议反编译自 WeLoop 官方 app。无需安装任何东西，仅用 Chrome / Edge。</div>
+<h1>⚡ WeLoop Extended Protocol Manager</h1>
+<div class="sub">Includes reverse-engineered <b>Sport Tracking, GPS Sync, Heart Rate, and Watch Control</b> from WeLoop BLE SDK.</div>
 
+<!-- 1. Connection Card -->
 <div class="card">
-  <h2>1. 选择设备并同步</h2>
-  <label>时区（小时偏移，中国填 8）</label>
-  <input type="number" id="tz" value="8" step="0.5">
-  <div class="row" style="margin-top:12px;">
-    <button id="btnSync">🔗 连接并同步时间</button>
-    <button id="btnDisconnect" class="ghost" disabled>断开</button>
+  <h2>
+    <span>Device Connection</span>
+    <div>
+      <span id="batteryBadge" style="font-size:11px; color:var(--mut); margin-right:8px;">Battery: --</span>
+      <span id="status" class="status off">Disconnected</span>
+    </div>
+  </h2>
+  <div class="row">
+    <button id="btnConnect">🔗 Connect Device</button>
+    <button id="btnDisconnect" class="ghost" disabled>Disconnect</button>
+    <button id="btnReadBattery" class="ghost" disabled>🔋 Read Battery</button>
   </div>
-  <div class="note">点击后 Chrome 会弹出蓝牙设备选择框，选 <b>WeLoop Hey 3S</b>。状态: <span id="status" class="status off">未连接</span></div>
 </div>
 
+<!-- 2. Sport Tracking Card (getSportSum 0x9F, setRunningTrack 0x54, SyncData 0x7C) -->
 <div class="card">
-  <h2>2. 日志</h2>
+  <h2>🏃 Sport Tracking & Live Counters</h2>
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="stat-box"><div id="statSteps" class="stat-val">--</div><div class="stat-lbl">Steps</div></div>
+    <div class="stat-box"><div id="statDist" class="stat-val">--</div><div class="stat-lbl">Distance (km)</div></div>
+    <div class="stat-box"><div id="statCal" class="stat-val">--</div><div class="stat-lbl">Calories (kcal)</div></div>
+    <div class="stat-box"><div id="statTime" class="stat-val">--</div><div class="stat-lbl">Active (min)</div></div>
+  </div>
+  
+  <div class="grid-2">
+    <button id="btnGetSportSum" class="cyan" disabled>📊 Query Today's Sport Totals (Cmd 0x9F)</button>
+    <button id="btnSyncSportHistory" class="ghost" disabled>📥 Sync Historical Steps (0x7C/0x05)</button>
+  </div>
+</div>
+
+<!-- 3. GPS & Running Track (ar.smali 0x54, i.smali 0x9B, s.smali 0x0E) -->
+<div class="card">
+  <h2>🛰️ GPS & Running Mode</h2>
+  <div class="grid-3">
+    <button id="btnGpsStart" class="purple" disabled>▶️ Start Watch GPS Running (0x54 On)</button>
+    <button id="btnGpsStop" class="ghost" disabled>⏹️ Stop Running (0x54 Off)</button>
+    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query GPS EPO Info (0x9B)</button>
+  </div>
+  <div style="margin-top:10px;">
+    <button id="btnSyncGpsTrack" class="ghost" style="width:100%;" disabled>🗺️ Download Recorded GPS Route Points (0x7C/0x0E)</button>
+  </div>
+</div>
+
+<!-- 4. Time Sync & Heart Rate (au, ae) -->
+<div class="card">
+  <h2>🕒 Clock & Heart Rate Sensor</h2>
+  <div class="grid-3" style="margin-bottom:10px;">
+    <div>
+      <label>Time Sync Mode</label>
+      <select id="timeProto">
+        <option value="official" selected>Official 2-Step (0x90 Handshake)</option>
+        <option value="legacy">Legacy Single-Frame (0x8C)</option>
+      </select>
+    </div>
+    <div>
+      <label>Timezone Offset (Hours)</label>
+      <input type="number" id="tz" value="8" step="0.5">
+    </div>
+    <div>
+      <label>Hour Display</label>
+      <select id="timeFormat">
+        <option value="1" selected>24-Hour</option>
+        <option value="0">12-Hour</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid-3">
+    <button id="btnSyncTime" disabled>🕒 Sync Watch Clock</button>
+    <button id="btnHrOn" class="ghost" disabled>💓 Enable Continuous HR (0x62)</button>
+    <button id="btnHrOff" class="ghost" disabled>💔 Disable HR</button>
+  </div>
+  <div style="margin-top:10px;">
+    <button id="btnSyncHrHistory" class="ghost" style="width:100%;" disabled>📈 Download Dynamic Heart Rate Log (0x7C/0x06)</button>
+  </div>
+</div>
+
+<!-- 5. Watch Settings (ag, ac, af, m, w) -->
+<div class="card">
+  <h2>⚙️ Device Configuration & Triggers</h2>
+  <div class="grid-3">
+    <div>
+      <label>Raise-To-Wake (0xB7)</label>
+      <div class="row">
+        <button id="btnGestureOn" class="ghost" disabled>On</button>
+        <button id="btnGestureOff" class="ghost" disabled>Off</button>
+      </div>
+    </div>
+    <div>
+      <label>Backlight Level (0xB0)</label>
+      <select id="selBacklight" disabled>
+        <option value="0">Off (0x00)</option>
+        <option value="1" selected>Auto / Normal (0x01)</option>
+        <option value="2">High (0x02)</option>
+      </select>
+    </div>
+    <div>
+      <label>Anti-Lost Alert (0xB2)</label>
+      <div class="row">
+        <button id="btnAntiLostOn" class="ghost" disabled>On</button>
+        <button id="btnAntiLostOff" class="ghost" disabled>Off</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:12px;">
+    <div>
+      <label>Remote Camera Shutter (0x9C)</label>
+      <div class="row">
+        <button id="btnCameraEnter" class="ghost" disabled>Open Camera Screen</button>
+        <button id="btnCameraExit" class="ghost" disabled>Exit</button>
+      </div>
+    </div>
+    <div>
+      <label>Watch Maintenance</label>
+      <button id="btnReboot" class="danger" style="margin-top:2px; width:100%;" disabled>⚠️ Reboot Watch (0x89)</button>
+    </div>
+  </div>
+</div>
+
+<!-- 6. Activity Log -->
+<div class="card">
+  <h2>
+    <span>Activity Log</span>
+    <button id="btnClearLog" class="ghost" style="padding:2px 8px; font-size:11px;">Clear</button>
+  </h2>
   <div id="log" class="log"></div>
 </div>
 
-<div class="card">
-  <h2>说明 / 故障排除</h2>
-  <div class="note">
-    • <b>必须用 Chrome / Edge / Opera</b>（安卓 Chrome 也行）。Safari、Firefox 不支持 Web Bluetooth。<br>
-    • 页面要用 <code>https://</code> 或 <code>file://</code> 打开（直接双击本 HTML 文件即可）。<br>
-    • 安卓 Chrome：需 Android 6.0+，位置权限要开（BLE 扫描依赖位置权限）。<br>
-    • 连不上？先在系统蓝牙设置里<b>忽略/取消配对</b> Hey 3S（Web Bluetooth 不能用已配对设备），再重试。<br>
-    • 手表时间没变？断开手表蓝牙重连，部分固件要重连才刷新显示。<br>
-    • 选择框里看不到 Hey 3S？点右下角"没有看到我的设备？"，或靠近手表、给手表亮屏。
-  </div>
-  <details>
-    <summary>查看协议细节（反编译所得）</summary>
-<pre>BLE Service  : 6e400001-b5a3-f393-e0a9-77656c6f6f70  (后缀 ASCII = "weloop")
-写特征  RX   : 6e400002-b5a3-f393-e0a9-77656c6f6f70   手机 -> 手表
-通知特征 TX : 6e400003-b5a3-f393-e0a9-77656c6f6f70   手表 -> 手机
-设备名前缀   : "WeLoop Hey 3S"
-时间同步命令 : 140 (0x8C)
-时间戳算法   : (Unix秒 - 1388534400)  1388534400 = 2014-01-01 UTC
-payload(6字节): [4字节大端时间戳][时区/30min][时区/15min]
-分包         : [cmd][seq=0][payload]   6字节<18 单包
-成功返回     : [140][seq][1]
-</pre>
-  </details>
-</div>
+<details>
+  <summary>View Reverse-Engineered Command Reference Table</summary>
+  <pre>
+Frame Format:
+1. Standard H2DR (Host-to-Device Request):
+   [0..3]: "H2DR" (ASCII 0x48, 0x32, 0x44, 0x52)
+   [4]   : Command Opcode
+   [5]   : Subcommand
+   [6]   : Parameter / Sequence
+   [7]   : Checksum = sum(byte[0..6]) & 0xFF (f.a)
+
+2. 0xA5 Dialect:
+   [0]   : 0xA5 sync byte
+   [1]   : Opcode (0x54 Running, 0x62 HeartRate, 0x55 Weather)
+   [2..] : Payload
+
+Summary of Command Codes:
+- 0x9F : Get Total Steps, Distance, Calories, Active Time
+- 0x54 : Toggle Running Workout + GPS Mode (0xA5 0x54 [0/1])
+- 0x7C : Request Block Data Sync ([0x7C, 0x00, dataIndex, 4B address])
+         - 0x05: Sport records
+         - 0x06: Dynamic Heart Rate records
+         - 0x0E: GPS Track coordinates
+         - 0x0C: Diagnostic Logs
+- 0x9B : Get EPO Satellite Ephemeris Info
+- 0x90 : Time Sync Handshake (followed by 11-byte Calendar payload)
+- 0x62 : Toggle Continuous Heart Rate (0xA5 0x62 [0/1] 00 00 00 00 00)
+- 0xB7 : Raise-To-Wake Gesture Light (H2DR 0xB7 0x00 [0/1])
+- 0xB0 : Screen Backlight (H2DR 0xB0 0x00 [0/1/2])
+- 0xB2 : Anti-Lost Vibration (H2DR 0xB2 0x00 [0/1])
+- 0x9C : Camera Screen Control (H2DR 0x9C 0x00 [0x18/0x00])
+- 0x89 : Device Reboot (H2DR 0x89 0x01 0x00)
+  </pre>
+</details>
 
 <script>
-// ===== 协议常量（反编译 WeLoop_83624.apk 所得）=====
-const WEOLOOP_SERVICE_UUID = 0x6e400001b5a3f393e0a977656c6f6f70n; // 转成 128-bit UUID 字符串
-const SVC = "6e400001-b5a3-f393-e0a9-77656c6f6f70";
-const RX  = "6e400002-b5a3-f393-e0a9-77656c6f6f70";  // 写入手表
-const TX  = "6e400003-b5a3-f393-e0a9-77656c6f6f70";  // 手表通知
-const CMD_SYNC_TIME = 140;        // 0x8C
-const TIME_EPOCH = 1388534400;    // 2014-01-01 UTC
+// ===== Protocol UUIDs =====
+const SVC_WELOOP = "6e400001-b5a3-f393-e0a9-77656c6f6f70";
+const RX_CHAR    = "6e400002-b5a3-f393-e0a9-77656c6f6f70"; // Write
+const TX_CHAR    = "6e400003-b5a3-f393-e0a9-77656c6f6f70"; // Notify
+const SVC_BATT   = "0000180f-0000-1000-8000-00805f9b34fb";
+const CHAR_BATT  = "00002a19-0000-1000-8000-00805f9b34fb";
 
-const logEl = document.getElementById('log');
-const btnSync = document.getElementById('btnSync');
-const btnDis  = document.getElementById('btnDisconnect');
-const statusEl = document.getElementById('status');
-let server = null, rxChar = null, txChar = null;
-let waitResp = null; // {resolve, timer}
+// DOM
+const logEl        = document.getElementById('log');
+const statusEl     = document.getElementById('status');
+const batteryBadge = document.getElementById('batteryBadge');
+const btnConnect   = document.getElementById('btnConnect');
+const btnDisconnect= document.getElementById('btnDisconnect');
+const btnReadBattery = document.getElementById('btnReadBattery');
+const btnClearLog  = document.getElementById('btnClearLog');
 
+// Sport UI
+const statSteps = document.getElementById('statSteps');
+const statDist  = document.getElementById('statDist');
+const statCal   = document.getElementById('statCal');
+const statTime  = document.getElementById('statTime');
+
+let server = null, rxChar = null, txChar = null, battChar = null;
+let waitResp = null;
+
+// Logging
 function log(msg, cls='i') {
   const span = document.createElement('span');
   span.className = cls;
@@ -101,60 +267,126 @@ function log(msg, cls='i') {
   logEl.appendChild(span);
   logEl.scrollTop = logEl.scrollHeight;
 }
-const ok  = m => log(m, 'ok');
-const err = m => log(m, 'e');
-const mut = m => log(m, 'm');
-const warn= m => log(m, 'w');
+const ok   = m => log(m, 'ok');
+const err  = m => log(m, 'e');
+const mut  = m => log(m, 'm');
+const warn = m => log(m, 'w');
 
-function setStatus(on, txt) {
-  statusEl.textContent = txt;
+function toHex(u8) {
+  return Array.from(u8).map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
+btnClearLog.onclick = () => { logEl.innerHTML = ''; };
+
+// Enable/Disable Action Controls
+function setConnected(on) {
+  statusEl.textContent = on ? 'Connected' : 'Disconnected';
   statusEl.className = 'status ' + (on ? 'on' : 'off');
+  btnConnect.disabled = on;
+  btnDisconnect.disabled = !on;
+  btnReadBattery.disabled = !on;
+
+  const actionButtons = document.querySelectorAll('.card button:not(#btnConnect):not(#btnDisconnect):not(#btnClearLog)');
+  actionButtons.forEach(b => b.disabled = !on);
+  document.getElementById('selBacklight').disabled = !on;
+
+  if (!on) batteryBadge.textContent = 'Battery: --';
 }
 
-// 构造时间同步 payload (6 字节)
-function buildPayload(tzHours) {
-  const nowUnix = Math.floor(Date.now() / 1000);
-  const ts = nowUnix - TIME_EPOCH;            // uint32
-  const tzMin = Math.round(tzHours * 60);
-  const tz30 = (Math.floor(tzMin / 30) & 0xFF);
-  const tz15 = (Math.floor(tzMin / 15) & 0xFF);
-  const buf = new ArrayBuffer(6);
-  const dv  = new DataView(buf);
-  dv.setUint32(0, ts >>> 0, true);           // 小端 4 字节时间戳（hey 3s 固件按小端解析）
-  dv.setUint8(4, tz30);
-  dv.setUint8(5, tz15);
-  return { buf: new Uint8Array(buf), nowUnix, ts, tzMin, tz30, tz15 };
+// ===== Checksum Algorithm (com.yf.lib.bluetooth.b.b.f.a) =====
+function computeChecksum(bytes, start = 0, end = bytes.length - 1) {
+  let sum = 0;
+  for (let i = start; i < end; i++) {
+    sum = (sum + bytes[i]) & 0xFF;
+  }
+  return sum;
 }
 
-// 构造一包: [cmd][seq=0][payload]
-function buildPacket(cmd, payload) {
-  const pkt = new Uint8Array(2 + payload.length);
-  pkt[0] = cmd & 0xFF;
-  pkt[1] = 0x00;
-  pkt.set(payload, 2);
+function stampChecksum(bytes) {
+  bytes[bytes.length - 1] = computeChecksum(bytes);
+  return bytes;
+}
+
+// ===== Frame Builders =====
+function buildStandardFrame(magicStr, cmd, subCmd, seq) {
+  const frame = new Uint8Array(8);
+  for (let i = 0; i < 4; i++) frame[i] = magicStr.charCodeAt(i) & 0xFF;
+  frame[4] = cmd & 0xFF;
+  frame[5] = subCmd & 0xFF;
+  frame[6] = seq & 0xFF;
+  stampChecksum(frame);
+  return frame;
+}
+
+// 11-byte Time Payload builder (au.smali v())
+function build11ByteTimePayload(tzHours, is24H = 1) {
+  const targetDate = new Date(Date.now() + 2000);
+  const buf = new Uint8Array(11);
+  const year = targetDate.getFullYear();
+  buf[0] = year & 0xFF;
+  buf[1] = (year >> 8) & 0xFF;
+  buf[2] = targetDate.getMonth() + 1;
+  buf[3] = targetDate.getDate();
+  buf[4] = targetDate.getHours();
+  buf[5] = targetDate.getMinutes();
+  buf[6] = targetDate.getSeconds();
+  buf[7] = Math.round((tzHours * 60) / 30) & 0xFF; // Timezone in 30-min units
+  buf[8] = is24H ? 1 : 0;
+  buf[9] = 0x00;
+  stampChecksum(buf);
+  return buf;
+}
+
+// SyncData Request (s.smali l())
+function buildSyncDataPacket(dataIndex, address = 0) {
+  const pkt = new Uint8Array(7);
+  pkt[0] = 0x7C; // CMD 124
+  pkt[1] = 0x00; // SEQ
+  pkt[2] = dataIndex & 0xFF;
+  const dv = new DataView(pkt.buffer, 3, 4);
+  dv.setUint32(0, address, true); // Little-Endian 4-byte address
   return pkt;
 }
 
-function toHex(u8) {
-  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join(' ');
+// Send helper
+async function sendPacket(bytes, label = '') {
+  if (!rxChar) throw new Error('Not connected');
+  log(`[TX] ${label} (${bytes.length}B): ${toHex(bytes)}`, 'm');
+  await rxChar.writeValueWithoutResponse(bytes);
 }
 
-function parseResponse(data, expectedCmd) {
-  if (data.length < 2) { warn('返回包太短: ' + toHex(data)); return false; }
-  const cmd = data[0];
-  if (cmd !== expectedCmd) { warn(`命令号不匹配: 期望 ${expectedCmd}, 收到 ${cmd}`); return false; }
-  if (data.length >= 3) {
-    const r = data[2];
-    log(`[resp] cmd=${cmd} seq=${data[1]} result=${r}  (${r===1?'成功':'失败/未知'})`, r===1?'ok':'w');
-    return r === 1;
-  }
-  log(`[resp] cmd=${cmd} seq=${data[1]} (无 result 字段, 视为成功)`, 'i');
-  return true;
-}
-
+// ===== Incoming Packet Handler & Parsers =====
 function handleNotification(event) {
   const data = new Uint8Array(event.target.value.buffer);
-  log('[notify] 收到 ' + data.length + ' 字节: ' + toHex(data), 'i');
+  log(`[RX] Received (${data.length}B): ${toHex(data)}`, 'i');
+
+  // 1. Parse getSportSum response (b/b/d/l.smali)
+  // Payload returns: [stepCount 4B][distanceInCm 4B][calories 4B][totalTimeMinutes 2B]
+  if (data.length >= 14 && (data[0] !== 0x7C && data[0] !== 0x7D)) {
+    try {
+      const dv = new DataView(data.buffer);
+      const steps = dv.getUint32(0, true);
+      const distCm= dv.getUint32(4, true);
+      const cal   = dv.getUint32(8, true);
+      const mins  = dv.getUint16(12, true);
+
+      if (steps < 200000 && distCm < 50000000) {
+        statSteps.textContent = steps.toLocaleString();
+        statDist.textContent  = (distCm / 100000).toFixed(2);
+        statCal.textContent   = cal.toLocaleString();
+        statTime.textContent  = mins.toString();
+        ok(`🎯 Parsed Daily Sport Totals: Steps=${steps}, Dist=${(distCm/100000).toFixed(2)}km, Cal=${cal}kcal, Active=${mins}min`);
+      }
+    } catch(e){}
+  }
+
+  // 2. Parse SyncData Header / Chunks (0x7C / 0x7D)
+  if (data[0] === 0x7C && data.length >= 6) {
+    const dv = new DataView(data.buffer);
+    const blockSize = dv.getUint16(1, true);
+    ok(`📦 SyncData header: Block size = ${blockSize} bytes`);
+  }
+
   if (waitResp) {
     clearTimeout(waitResp.timer);
     const w = waitResp; waitResp = null;
@@ -162,107 +394,229 @@ function handleNotification(event) {
   }
 }
 
-btnSync.onclick = async () => {
+// ===== Bluetooth Connection =====
+btnConnect.onclick = async () => {
   if (!navigator.bluetooth) {
-    err('此浏览器不支持 Web Bluetooth。请用 Chrome / Edge / Opera（安卓 Chrome 也行）。');
+    err('Web Bluetooth is not supported in this browser. Use Chrome, Edge, or Opera.');
     return;
   }
-  const tz = parseFloat(document.getElementById('tz').value);
-  if (isNaN(tz)) { warn('时区填错了，用数字，如 8'); return; }
-
-  log('='.repeat(50), 'm');
-  log('开始连接 WeLoop Hey 3S ...', 'i');
-  const p = buildPayload(tz);
-  log(`[payload] unix=${p.nowUnix}  ts(减2014)=${p.ts}  tz_min=${p.tzMin}  tz30=${p.tz30}  tz15=${p.tz15}`, 'm');
-  const pkt = buildPacket(CMD_SYNC_TIME, p.buf);
-  log(`[packet] hex=${toHex(pkt)}  (${pkt.length} 字节)  cmd=${CMD_SYNC_TIME}`, 'm');
-
-  let device;
   try {
-    // namePrefix 过滤: 只显示 WeLoop Hey 3S
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'WeLoop Hey 3S' }],
-      optionalServices: [SVC]
+    log('Scanning for WeLoop devices...', 'i');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { namePrefix: 'WeLoop' },
+        { namePrefix: 'Hey 3S' },
+        { namePrefix: 'Tommy' },
+        { namePrefix: 'Now' }
+      ],
+      optionalServices: [SVC_WELOOP, SVC_BATT]
     });
-    log('已选设备: ' + (device.name || '(无名)') + '  id=' + device.id, 'i');
-  } catch (e) {
-    if (e.name === 'NotFoundError') {
-      warn('选择框里没看到 Hey 3S？试试: 靠近手表 / 手表亮屏 / 系统蓝牙里取消已配对的 Hey 3S。');
-    } else {
-      err('选择设备失败: ' + e.message);
-    }
-    return;
-  }
 
-  try {
-    log('连接 GATT server ...', 'i');
+    log(`Device selected: ${device.name || 'WeLoop Watch'} (${device.id})`, 'i');
     server = await device.gatt.connect();
-    setStatus(true, '已连接');
+    setConnected(true);
+
     device.addEventListener('gattserverdisconnected', () => {
-      setStatus(false, '已断开');
-      log('[event] 设备断开', 'w');
-      btnSync.disabled = false; btnDis.disabled = true;
+      setConnected(false);
+      warn('Device disconnected.');
     });
 
-    log('获取 weloop service ...', 'i');
-    let svc;
+    // WeLoop Service
+    const svc = await server.getPrimaryService(SVC_WELOOP);
+    rxChar = await svc.getCharacteristic(RX_CHAR);
+    txChar = await svc.getCharacteristic(TX_CHAR);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', handleNotification);
+    ok('Subscribed to RX/TX telemetry channel.');
+
+    // Battery Service (Optional)
     try {
-      svc = await server.getPrimaryService(SVC);
-    } catch (e) {
-      err('未找到 weloop service ' + SVC);
-      err('可能设备不是 Hey 3S，或固件协议不同。');
-      return;
+      const bSvc = await server.getPrimaryService(SVC_BATT);
+      battChar = await bSvc.getCharacteristic(CHAR_BATT);
+      const val = await battChar.readValue();
+      const pct = val.getUint8(0);
+      batteryBadge.textContent = `Battery: ${pct}%`;
+      ok(`Battery Level: ${pct}%`);
+    } catch(e) {
+      mut('Battery service not available on this profile.');
     }
+  } catch(e) {
+    err(`Connection error: ${e.message}`);
+    setConnected(false);
+  }
+};
 
-    log('获取特征值 ...', 'i');
-    try { rxChar = await svc.getCharacteristic(RX); } catch(e) { err('获取写特征失败: ' + e.message); return; }
-    try { txChar = await svc.getCharacteristic(TX); } catch(e) { warn('获取通知特征失败: ' + e.message); }
+btnDisconnect.onclick = () => {
+  if (server && server.connected) server.disconnect();
+  setConnected(false);
+};
 
-    // 订阅通知
-    if (txChar) {
-      try {
-        await txChar.startNotifications();
-        txChar.addEventListener('characteristicvaluechanged', handleNotification);
-        ok('已订阅通知 ' + TX);
-      } catch(e) { warn('订阅通知失败: ' + e.message + ' (继续, 部分表不回包)'); }
-    }
+btnReadBattery.onclick = async () => {
+  if (!battChar) { warn('Battery characteristic not found.'); return; }
+  try {
+    const val = await battChar.readValue();
+    const pct = val.getUint8(0);
+    batteryBadge.textContent = `Battery: ${pct}%`;
+    ok(`Battery Level: ${pct}%`);
+  } catch(e) { err(`Battery read failed: ${e.message}`); }
+};
 
-    // 发送时间同步包
-    log('写入时间同步包 ...', 'i');
-    await rxChar.writeValueWithoutResponse(pkt);
-    ok('已写入 ' + pkt.length + ' 字节');
+// ===== Sport Tracking Commands =====
+// 1. Query Today's Sport Totals (b/b/d/l.smali - 0x9F)
+document.getElementById('btnGetSportSum').onclick = async () => {
+  try {
+    const frame = buildStandardFrame("H2DR", 0x9F, 0x00, 0x00);
+    await sendPacket(frame, 'Query Daily Totals (0x9F)');
+    ok('Requested daily sport summary. Waiting for response...');
+  } catch(e) { err(`Query totals failed: ${e.message}`); }
+};
 
-    // 等待返回（最多 5 秒）
-    const resp = await new Promise(resolve => {
-      waitResp = { resolve, timer: setTimeout(() => { waitResp = null; resolve(null); }, 5000) };
-    });
-    if (resp) {
-      const success = parseResponse(resp, CMD_SYNC_TIME);
-      if (success) ok('\n✅ 时间同步成功！');
-      else warn('\n⚠️ 设备返回非成功，时间可能未同步。可断开重连后再试。');
+// 2. Sync Historical Sport Data (s.smali - 0x7C index 5)
+document.getElementById('btnSyncSportHistory').onclick = async () => {
+  try {
+    const pkt = buildSyncDataPacket(5, 0); // dataIndex = 5 (sport)
+    await sendPacket(pkt, 'Sync Historical Sport Logs (0x7C / 0x05)');
+    ok('Sent historical sport log request.');
+  } catch(e) { err(`Sync sport failed: ${e.message}`); }
+};
+
+// ===== GPS & Running Commands =====
+// 1. Start Watch GPS Running Mode (ar.smali - 0xA5 0x54 0x01)
+document.getElementById('btnGpsStart').onclick = async () => {
+  try {
+    const pkt = new Uint8Array([0xA5, 0x54, 0x01]);
+    await sendPacket(pkt, 'Start GPS Running Mode (0xA5 0x54 0x01)');
+    ok('✅ Watch GPS Running Mode activated!');
+  } catch(e) { err(`GPS start failed: ${e.message}`); }
+};
+
+// 2. Stop Watch GPS Running Mode (ar.smali - 0xA5 0x54 0x00)
+document.getElementById('btnGpsStop').onclick = async () => {
+  try {
+    const pkt = new Uint8Array([0xA5, 0x54, 0x00]);
+    await sendPacket(pkt, 'Stop GPS Running Mode (0xA5 0x54 0x00)');
+    ok('✅ Watch GPS Running Mode stopped.');
+  } catch(e) { err(`GPS stop failed: ${e.message}`); }
+};
+
+// 3. Query GPS Satellite EPO Info (i.smali - 0x9B)
+document.getElementById('btnQueryEpo').onclick = async () => {
+  try {
+    const frame = buildStandardFrame("H2DR", 0x9B, 0x00, 0x00);
+    await sendPacket(frame, 'Query GPS EPO Info (0x9B)');
+    ok('Requested GPS satellite ephemeris status.');
+  } catch(e) { err(`EPO query failed: ${e.message}`); }
+};
+
+// 4. Download Recorded GPS Track Points (s.smali - 0x7C index 14)
+document.getElementById('btnSyncGpsTrack').onclick = async () => {
+  try {
+    const pkt = buildSyncDataPacket(14, 0); // dataIndex = 14 (0x0E = GPS track)
+    await sendPacket(pkt, 'Sync GPS Track Coordinates (0x7C / 0x0E)');
+    ok('Sent GPS coordinate record download request.');
+  } catch(e) { err(`Sync GPS failed: ${e.message}`); }
+};
+
+// ===== Time Sync & Heart Rate =====
+document.getElementById('btnSyncTime').onclick = async () => {
+  const proto = document.getElementById('timeProto').value;
+  const tz = parseFloat(document.getElementById('tz').value) || 8;
+  const is24H = parseInt(document.getElementById('timeFormat').value, 10);
+
+  try {
+    if (proto === 'official') {
+      const handshake = buildStandardFrame("H2DR", 0x90, 0x0B, 0x00);
+      await sendPacket(handshake, 'Time Sync Step 1 Handshake (0x90)');
+      
+      const payload = build11ByteTimePayload(tz, is24H);
+      await sendPacket(payload, 'Time Sync Step 2 Calendar Payload (11B)');
+      ok('✅ Time synchronization packets dispatched.');
     } else {
-      warn('\n未收到返回包（5秒超时）。部分 weeloop 表写完即生效。');
-      log('请看手表时间是否已更新；若没变，断开手表蓝牙重连后再跑一次。', 'm');
+      const nowUnix = Math.floor(Date.now() / 1000) - 1388534400;
+      const pkt = new Uint8Array(8);
+      pkt[0] = 140; // 0x8C
+      pkt[1] = 0x00;
+      const dv = new DataView(pkt.buffer, 2, 6);
+      dv.setUint32(0, nowUnix >>> 0, true);
+      dv.setUint8(4, Math.round((tz * 60) / 30) & 0xFF);
+      dv.setUint8(5, Math.round((tz * 60) / 15) & 0xFF);
+      await sendPacket(pkt, 'Legacy Time Packet (0x8C)');
+      ok('✅ Legacy time packet sent.');
     }
-
-    btnSync.disabled = false; btnDis.disabled = false;
-  } catch (e) {
-    err('同步过程出错: ' + e.name + ' - ' + e.message);
-    if (/NetworkError|GATT/i.test(e.name)) warn('  GATT 操作失败: 设备可能已断开或不在范围。');
-  }
+  } catch(e) { err(`Time sync error: ${e.message}`); }
 };
 
-btnDis.onclick = () => {
-  if (server && server.connected) {
-    try { server.disconnect(); } catch(e){}
-    log('已主动断开', 'i');
-  }
-  setStatus(false, '未连接');
-  btnSync.disabled = false; btnDis.disabled = true;
+// Heart Rate Toggle (ae.smali - 0xA5 0x62)
+document.getElementById('btnHrOn').onclick = async () => {
+  try {
+    const pkt = new Uint8Array([0xA5, 0x62, 0x01, 0, 0, 0, 0, 0]);
+    await sendPacket(pkt, 'Enable Continuous Heart Rate (0xA5 0x62 0x01)');
+    ok('Continuous HR monitoring enabled.');
+  } catch(e) { err(`HR On failed: ${e.message}`); }
 };
 
-mut('就绪。点击"连接并同步时间"开始。');
-mut('提示: 这台机器没蓝牙也能用——把此 HTML 拷到带蓝牙的电脑/手机用 Chrome 打开即可。');
+document.getElementById('btnHrOff').onclick = async () => {
+  try {
+    const pkt = new Uint8Array([0xA5, 0x62, 0x00, 0, 0, 0, 0, 0]);
+    await sendPacket(pkt, 'Disable Continuous Heart Rate (0xA5 0x62 0x00)');
+    ok('Continuous HR monitoring disabled.');
+  } catch(e) { err(`HR Off failed: ${e.message}`); }
+};
+
+document.getElementById('btnSyncHrHistory').onclick = async () => {
+  try {
+    const pkt = buildSyncDataPacket(6, 0); // dataIndex = 6 (dynamic HR)
+    await sendPacket(pkt, 'Sync Dynamic HR History (0x7C / 0x06)');
+    ok('Sent heart rate log download request.');
+  } catch(e) { err(`Sync HR failed: ${e.message}`); }
+};
+
+// ===== Device Settings =====
+// Gesture Light (ag.smali - 0xB7)
+document.getElementById('btnGestureOn').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0xB7, 0, 1), 'Gesture Light On (0xB7 0x01)');
+  ok('Raise-to-wake gesture enabled.');
+};
+document.getElementById('btnGestureOff').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0xB7, 0, 0), 'Gesture Light Off (0xB7 0x00)');
+  ok('Raise-to-wake gesture disabled.');
+};
+
+// Backlight (ac.smali - 0xB0)
+document.getElementById('selBacklight').onchange = async (e) => {
+  const val = parseInt(e.target.value, 10);
+  await sendPacket(buildStandardFrame("H2DR", 0xB0, 0, val), `Backlight Level ${val} (0xB0)`);
+  ok(`Backlight set to mode ${val}.`);
+};
+
+// Anti-Lost (af.smali - 0xB2)
+document.getElementById('btnAntiLostOn').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0xB2, 0, 1), 'Anti-Lost On (0xB2 0x01)');
+  ok('Anti-lost warning enabled.');
+};
+document.getElementById('btnAntiLostOff').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0xB2, 0, 0), 'Anti-Lost Off (0xB2 0x00)');
+  ok('Anti-lost warning disabled.');
+};
+
+// Camera Remote (m.smali 0x9C 0x18 / e.smali 0x9C 0x00)
+document.getElementById('btnCameraEnter').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0x9C, 0, 0x18), 'Enter Camera Mode (0x9C 0x18)');
+  ok('Opened camera shutter view on watch.');
+};
+document.getElementById('btnCameraExit').onclick = async () => {
+  await sendPacket(buildStandardFrame("H2DR", 0x9C, 0, 0x00), 'Exit Camera Mode (0x9C 0x00)');
+  ok('Exited camera mode on watch.');
+};
+
+// Reboot Watch (w.smali - 0x89)
+document.getElementById('btnReboot').onclick = async () => {
+  if (!confirm('Reboot the watch now?')) return;
+  await sendPacket(buildStandardFrame("H2DR", 0x89, 1, 0), 'Watch Reboot (0x89 0x01)');
+  ok('Dispatched reboot command.');
+};
+
+mut('Ready. Open in Google Chrome or Microsoft Edge and click "Connect Device".');
 </script>
 </body>
 </html>
