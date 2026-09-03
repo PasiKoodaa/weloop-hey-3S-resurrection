@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WeLoop Swiss Knife (Sport, GPS & Control)</title>
+<title>WeLoop Hey 3S Protocol V2 Control Panel</title>
 <style>
   :root {
-    --bg:#121212; --card:#1e1e1e; --card-alt:#252525; --border:#333; 
-    --txt:#e4e4e7; --mut:#a1a1aa; --acc:#3b82f6; --acc-h:#2563eb;
+    --bg:#121214; --card:#1c1c20; --border:#2e2e34;
+    --txt:#f4f4f5; --mut:#a1a1aa; --acc:#3b82f6; --acc-h:#2563eb;
     --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --cyan:#06b6d4; --purple:#a855f7;
   }
   * { box-sizing:border-box; }
@@ -17,6 +17,7 @@
     line-height:1.5; max-width:800px; margin:0 auto;
   }
   h1 { font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .badge-v2 { background:#1e3a8a; color:#93c5fd; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
   .sub { color:var(--mut); font-size:12px; margin-bottom:16px; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:15px 18px; margin-bottom:14px; }
   .card h2 { margin:0 0 10px; font-size:14px; color:var(--acc); font-weight:600; display:flex; justify-content:space-between; align-items:center; }
@@ -26,30 +27,23 @@
     transition:background .15s, opacity .15s;
   }
   button:hover { background:var(--acc-h); }
-  button:disabled { background:#3a3a3a; color:#777; cursor:not-allowed; opacity:.6; }
+  button:disabled { background:#2a2a30; color:#666; cursor:not-allowed; opacity:.6; }
   button.ghost { background:transparent; border:1px solid var(--border); color:var(--txt); }
-  button.ghost:hover { background:#2a2a2a; }
+  button.ghost:hover { background:#2a2a32; }
   button.cyan { background:var(--cyan); color:#083344; }
-  button.cyan:hover { opacity:.9; }
   button.purple { background:var(--purple); color:#fff; }
-  button.purple:hover { opacity:.9; }
   button.danger { background:var(--err); color:#fff; }
-  button.danger:hover { opacity:.9; }
   .row { display:flex; gap:8px; align-items:center; }
   .row > * { flex:1; }
   .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-  .grid-4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
   label { display:block; font-size:11px; color:var(--mut); margin:8px 0 3px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
   input, select {
-    width:100%; background:#171717; border:1px solid var(--border);
+    width:100%; background:#141416; border:1px solid var(--border);
     color:var(--txt); border-radius:6px; padding:7px 9px; font-size:13px;
   }
-  .stat-box { background:var(--card-alt); border:1px solid var(--border); border-radius:6px; padding:8px 10px; text-align:center; }
-  .stat-val { font-size:16px; font-weight:700; color:var(--txt); }
-  .stat-lbl { font-size:10px; color:var(--mut); text-transform:uppercase; }
   .log {
-    background:#0a0a0a; border:1px solid var(--border); border-radius:8px;
+    background:#09090b; border:1px solid var(--border); border-radius:8px;
     padding:10px 12px; font-family:"SF Mono",Consolas,Menlo,monospace;
     font-size:11px; line-height:1.5; height:220px; overflow:auto;
     white-space:pre-wrap; word-break:break-all;
@@ -57,16 +51,13 @@
   .log .i { color:#93c5fd; } .log .ok { color:var(--ok); } .log .w { color:var(--warn); } .log .e { color:var(--err); } .log .m { color:var(--mut); }
   .status { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
   .status.on { background:var(--ok); color:#052e16; }
-  .status.off { background:#444; color:#ccc; }
-  details { margin-top:8px; }
-  details summary { cursor:pointer; color:var(--mut); font-size:12px; }
-  details pre { background:#0a0a0a; padding:10px; border-radius:6px; overflow:auto; font-size:11px; color:#bbb; margin-top:6px; border:1px solid #222; }
+  .status.off { background:#3f3f46; color:#d4d4d8; }
 </style>
 </head>
 <body>
 
-<h1>⚡ WeLoop Extended Protocol Manager</h1>
-<div class="sub">Includes reverse-engineered <b>Sport Tracking, GPS Sync, Heart Rate, and Watch Control</b> from WeLoop BLE SDK.</div>
+<h1>⌚ WeLoop Hey 3S <span class="badge-v2">Native Protocol V2</span></h1>
+<div class="sub">Uses exact byte layouts from <code>com.yf.lib.bluetooth.b.c.b.r</code> (Direct GATT Framing, no legacy H2DR wrappers).</div>
 
 <!-- 1. Connection Card -->
 <div class="card">
@@ -78,95 +69,77 @@
     </div>
   </h2>
   <div class="row">
-    <button id="btnConnect">🔗 Connect Device</button>
+    <button id="btnConnect">🔗 Connect Hey 3S</button>
     <button id="btnDisconnect" class="ghost" disabled>Disconnect</button>
     <button id="btnReadBattery" class="ghost" disabled>🔋 Read Battery</button>
   </div>
 </div>
 
-<!-- 2. Sport Tracking Card (getSportSum 0x9F, setRunningTrack 0x54, SyncData 0x7C) -->
+<!-- 2. Time Synchronization (0x8C) -->
 <div class="card">
-  <h2>🏃 Sport Tracking & Live Counters</h2>
-  <div class="grid-4" style="margin-bottom:12px;">
-    <div class="stat-box"><div id="statSteps" class="stat-val">--</div><div class="stat-lbl">Steps</div></div>
-    <div class="stat-box"><div id="statDist" class="stat-val">--</div><div class="stat-lbl">Distance (km)</div></div>
-    <div class="stat-box"><div id="statCal" class="stat-val">--</div><div class="stat-lbl">Calories (kcal)</div></div>
-    <div class="stat-box"><div id="statTime" class="stat-val">--</div><div class="stat-lbl">Active (min)</div></div>
-  </div>
-  
+  <h2>🕒 Clock Synchronization (Cmd 0x8C)</h2>
   <div class="grid-2">
-    <button id="btnGetSportSum" class="cyan" disabled>📊 Query Today's Sport Totals (Cmd 0x9F)</button>
-    <button id="btnSyncSportHistory" class="ghost" disabled>📥 Sync Historical Steps (0x7C/0x05)</button>
-  </div>
-</div>
-
-<!-- 3. GPS & Running Track (ar.smali 0x54, i.smali 0x9B, s.smali 0x0E) -->
-<div class="card">
-  <h2>🛰️ GPS & Running Mode</h2>
-  <div class="grid-3">
-    <button id="btnGpsStart" class="purple" disabled>▶️ Start Watch GPS Running (0x54 On)</button>
-    <button id="btnGpsStop" class="ghost" disabled>⏹️ Stop Running (0x54 Off)</button>
-    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query GPS EPO Info (0x9B)</button>
-  </div>
-  <div style="margin-top:10px;">
-    <button id="btnSyncGpsTrack" class="ghost" style="width:100%;" disabled>🗺️ Download Recorded GPS Route Points (0x7C/0x0E)</button>
-  </div>
-</div>
-
-<!-- 4. Time Sync & Heart Rate (au, ae) -->
-<div class="card">
-  <h2>🕒 Clock & Heart Rate Sensor</h2>
-  <div class="grid-3" style="margin-bottom:10px;">
-    <div>
-      <label>Time Sync Mode</label>
-      <select id="timeProto">
-        <option value="official" selected>Official 2-Step (0x90 Handshake)</option>
-        <option value="legacy">Legacy Single-Frame (0x8C)</option>
-      </select>
-    </div>
     <div>
       <label>Timezone Offset (Hours)</label>
       <input type="number" id="tz" value="8" step="0.5">
     </div>
     <div>
-      <label>Hour Display</label>
+      <label>Hour Display Mode</label>
       <select id="timeFormat">
-        <option value="1" selected>24-Hour</option>
-        <option value="0">12-Hour</option>
+        <option value="1" selected>24-Hour Clock</option>
+        <option value="0">12-Hour Clock</option>
       </select>
     </div>
   </div>
-  <div class="grid-3">
-    <button id="btnSyncTime" disabled>🕒 Sync Watch Clock</button>
-    <button id="btnHrOn" class="ghost" disabled>💓 Enable Continuous HR (0x62)</button>
-    <button id="btnHrOff" class="ghost" disabled>💔 Disable HR</button>
-  </div>
   <div style="margin-top:10px;">
-    <button id="btnSyncHrHistory" class="ghost" style="width:100%;" disabled>📈 Download Dynamic Heart Rate Log (0x7C/0x06)</button>
+    <button id="btnSyncTime" disabled>🕒 Sync Watch Time (0x8C)</button>
   </div>
 </div>
 
-<!-- 5. Watch Settings (ag, ac, af, m, w) -->
+<!-- 3. Workout Tracking & GPS (0x98, 0x9B, 0x7C/0x0E) -->
 <div class="card">
-  <h2>⚙️ Device Configuration & Triggers</h2>
+  <h2>🏃 Workout & GPS Tracking (Cmd 0x98 / 0x9B / 0x7C)</h2>
+  <div class="grid-3">
+    <button id="btnWorkoutOn" class="purple" disabled>▶️ Start Workout/GPS (0x98 On)</button>
+    <button id="btnWorkoutOff" class="ghost" disabled>⏹️ Stop Workout (0x98 Off)</button>
+    <button id="btnQueryEpo" class="ghost" disabled>🛰️ Query EPO Satellites (0x9B)</button>
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <button id="btnSyncGpsTrack" class="ghost" disabled>🗺️ Sync GPS Track Coordinates (0x7C/0x0E)</button>
+    <button id="btnSyncSportData" class="ghost" disabled>📊 Sync Historical Steps (0x7C/0x05)</button>
+  </div>
+</div>
+
+<!-- 4. Heart Rate Monitor (0x97, 0x7C/0x06) -->
+<div class="card">
+  <h2>💓 Heart Rate Monitor (Cmd 0x97 / 0x7C)</h2>
+  <div class="grid-3">
+    <button id="btnHrOn" class="cyan" disabled>Enable Auto HR (0x97 On)</button>
+    <button id="btnHrOff" class="ghost" disabled>Disable Auto HR (0x97 Off)</button>
+    <button id="btnSyncHrLogs" class="ghost" disabled>📈 Download HR Logs (0x7C/0x06)</button>
+  </div>
+</div>
+
+<!-- 5. Watch Settings & Controls -->
+<div class="card">
+  <h2>⚙️ Settings & Device Controls (0x80, 0x81, 0x88, 0x8D, 0x89)</h2>
   <div class="grid-3">
     <div>
-      <label>Raise-To-Wake (0xB7)</label>
+      <label>Raise-To-Wake (0x80)</label>
       <div class="row">
         <button id="btnGestureOn" class="ghost" disabled>On</button>
         <button id="btnGestureOff" class="ghost" disabled>Off</button>
       </div>
     </div>
     <div>
-      <label>Backlight Level (0xB0)</label>
-      <select id="selBacklight" disabled>
-        <option value="0">Off (0x00)</option>
-        <option value="1" selected>Auto / Normal (0x01)</option>
-        <option value="2">High (0x02)</option>
-      </select>
+      <label>Wear Hand (0x81)</label>
+      <div class="row">
+        <button id="btnWearLeft" class="ghost" disabled>Left</button>
+        <button id="btnWearRight" class="ghost" disabled>Right</button>
+      </div>
     </div>
     <div>
-      <label>Anti-Lost Alert (0xB2)</label>
+      <label>Anti-Lost Alert (0x88)</label>
       <div class="row">
         <button id="btnAntiLostOn" class="ghost" disabled>On</button>
         <button id="btnAntiLostOff" class="ghost" disabled>Off</button>
@@ -176,15 +149,15 @@
 
   <div class="grid-2" style="margin-top:12px;">
     <div>
-      <label>Remote Camera Shutter (0x9C)</label>
+      <label>Remote Camera Mode (0x8D)</label>
       <div class="row">
-        <button id="btnCameraEnter" class="ghost" disabled>Open Camera Screen</button>
-        <button id="btnCameraExit" class="ghost" disabled>Exit</button>
+        <button id="btnCameraOn" class="ghost" disabled>Open Camera Screen</button>
+        <button id="btnCameraOff" class="ghost" disabled>Exit</button>
       </div>
     </div>
     <div>
-      <label>Watch Maintenance</label>
-      <button id="btnReboot" class="danger" style="margin-top:2px; width:100%;" disabled>⚠️ Reboot Watch (0x89)</button>
+      <label>Device Maintenance (0x89)</label>
+      <button id="btnReboot" class="danger" style="width:100%;" disabled>⚠️ Reboot Watch (0x89)</button>
     </div>
   </div>
 </div>
@@ -198,43 +171,8 @@
   <div id="log" class="log"></div>
 </div>
 
-<details>
-  <summary>View Reverse-Engineered Command Reference Table</summary>
-  <pre>
-Frame Format:
-1. Standard H2DR (Host-to-Device Request):
-   [0..3]: "H2DR" (ASCII 0x48, 0x32, 0x44, 0x52)
-   [4]   : Command Opcode
-   [5]   : Subcommand
-   [6]   : Parameter / Sequence
-   [7]   : Checksum = sum(byte[0..6]) & 0xFF (f.a)
-
-2. 0xA5 Dialect:
-   [0]   : 0xA5 sync byte
-   [1]   : Opcode (0x54 Running, 0x62 HeartRate, 0x55 Weather)
-   [2..] : Payload
-
-Summary of Command Codes:
-- 0x9F : Get Total Steps, Distance, Calories, Active Time
-- 0x54 : Toggle Running Workout + GPS Mode (0xA5 0x54 [0/1])
-- 0x7C : Request Block Data Sync ([0x7C, 0x00, dataIndex, 4B address])
-         - 0x05: Sport records
-         - 0x06: Dynamic Heart Rate records
-         - 0x0E: GPS Track coordinates
-         - 0x0C: Diagnostic Logs
-- 0x9B : Get EPO Satellite Ephemeris Info
-- 0x90 : Time Sync Handshake (followed by 11-byte Calendar payload)
-- 0x62 : Toggle Continuous Heart Rate (0xA5 0x62 [0/1] 00 00 00 00 00)
-- 0xB7 : Raise-To-Wake Gesture Light (H2DR 0xB7 0x00 [0/1])
-- 0xB0 : Screen Backlight (H2DR 0xB0 0x00 [0/1/2])
-- 0xB2 : Anti-Lost Vibration (H2DR 0xB2 0x00 [0/1])
-- 0x9C : Camera Screen Control (H2DR 0x9C 0x00 [0x18/0x00])
-- 0x89 : Device Reboot (H2DR 0x89 0x01 0x00)
-  </pre>
-</details>
-
 <script>
-// ===== Protocol UUIDs =====
+// ===== Protocol Constants for Hey 3S (V2) =====
 const SVC_WELOOP = "6e400001-b5a3-f393-e0a9-77656c6f6f70";
 const RX_CHAR    = "6e400002-b5a3-f393-e0a9-77656c6f6f70"; // Write
 const TX_CHAR    = "6e400003-b5a3-f393-e0a9-77656c6f6f70"; // Notify
@@ -250,16 +188,8 @@ const btnDisconnect= document.getElementById('btnDisconnect');
 const btnReadBattery = document.getElementById('btnReadBattery');
 const btnClearLog  = document.getElementById('btnClearLog');
 
-// Sport UI
-const statSteps = document.getElementById('statSteps');
-const statDist  = document.getElementById('statDist');
-const statCal   = document.getElementById('statCal');
-const statTime  = document.getElementById('statTime');
-
 let server = null, rxChar = null, txChar = null, battChar = null;
-let waitResp = null;
 
-// Logging
 function log(msg, cls='i') {
   const span = document.createElement('span');
   span.className = cls;
@@ -278,7 +208,6 @@ function toHex(u8) {
 
 btnClearLog.onclick = () => { logEl.innerHTML = ''; };
 
-// Enable/Disable Action Controls
 function setConnected(on) {
   statusEl.textContent = on ? 'Connected' : 'Disconnected';
   statusEl.className = 'status ' + (on ? 'on' : 'off');
@@ -288,64 +217,37 @@ function setConnected(on) {
 
   const actionButtons = document.querySelectorAll('.card button:not(#btnConnect):not(#btnDisconnect):not(#btnClearLog)');
   actionButtons.forEach(b => b.disabled = !on);
-  document.getElementById('selBacklight').disabled = !on;
-
   if (!on) batteryBadge.textContent = 'Battery: --';
 }
 
-// ===== Checksum Algorithm (com.yf.lib.bluetooth.b.b.f.a) =====
-function computeChecksum(bytes, start = 0, end = bytes.length - 1) {
-  let sum = 0;
-  for (let i = start; i < end; i++) {
-    sum = (sum + bytes[i]) & 0xFF;
-  }
-  return sum;
-}
-
-function stampChecksum(bytes) {
-  bytes[bytes.length - 1] = computeChecksum(bytes);
-  return bytes;
-}
-
-// ===== Frame Builders =====
-function buildStandardFrame(magicStr, cmd, subCmd, seq) {
-  const frame = new Uint8Array(8);
-  for (let i = 0; i < 4; i++) frame[i] = magicStr.charCodeAt(i) & 0xFF;
-  frame[4] = cmd & 0xFF;
-  frame[5] = subCmd & 0xFF;
-  frame[6] = seq & 0xFF;
-  stampChecksum(frame);
-  return frame;
-}
-
-// 11-byte Time Payload builder (au.smali v())
-function build11ByteTimePayload(tzHours, is24H = 1) {
-  const targetDate = new Date(Date.now() + 2000);
-  const buf = new Uint8Array(11);
-  const year = targetDate.getFullYear();
-  buf[0] = year & 0xFF;
-  buf[1] = (year >> 8) & 0xFF;
-  buf[2] = targetDate.getMonth() + 1;
-  buf[3] = targetDate.getDate();
-  buf[4] = targetDate.getHours();
-  buf[5] = targetDate.getMinutes();
-  buf[6] = targetDate.getSeconds();
-  buf[7] = Math.round((tzHours * 60) / 30) & 0xFF; // Timezone in 30-min units
-  buf[8] = is24H ? 1 : 0;
-  buf[9] = 0x00;
-  stampChecksum(buf);
-  return buf;
-}
-
-// SyncData Request (s.smali l())
-function buildSyncDataPacket(dataIndex, address = 0) {
-  const pkt = new Uint8Array(7);
-  pkt[0] = 0x7C; // CMD 124
+// ===== Native Protocol V2 Frame Builder =====
+// Format: [CMD, SEQ=0x00, ...payload]
+function buildV2Packet(cmd, payloadArray = []) {
+  const pkt = new Uint8Array(2 + payloadArray.length);
+  pkt[0] = cmd & 0xFF;
   pkt[1] = 0x00; // SEQ
-  pkt[2] = dataIndex & 0xFF;
-  const dv = new DataView(pkt.buffer, 3, 4);
-  dv.setUint32(0, address, true); // Little-Endian 4-byte address
+  if (payloadArray.length > 0) {
+    pkt.set(payloadArray, 2);
+  }
   return pkt;
+}
+
+// 1. Time Sync (r.smali a(ag) - Cmd 0x8C)
+function buildTimePacket(tzHours, is24H = 1) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const ts = nowSec - 1388534400; // Epoch: 2014-01-01 UTC (p.smali a())
+  const tzMin = Math.round(tzHours * 60);
+  const tz30 = Math.round(tzMin / 30) & 0xFF;
+  const tz15 = Math.round(tzMin / 15) & 0xFF;
+
+  const payload = new Uint8Array(7);
+  const dv = new DataView(payload.buffer);
+  dv.setUint32(0, ts >>> 0, true); // Little-Endian 4-byte timestamp
+  payload[4] = tz30;
+  payload[5] = tz15;
+  payload[6] = is24H ? 1 : 0;
+
+  return buildV2Packet(0x8C, payload);
 }
 
 // Send helper
@@ -355,64 +257,38 @@ async function sendPacket(bytes, label = '') {
   await rxChar.writeValueWithoutResponse(bytes);
 }
 
-// ===== Incoming Packet Handler & Parsers =====
+// Incoming notifications
 function handleNotification(event) {
   const data = new Uint8Array(event.target.value.buffer);
   log(`[RX] Received (${data.length}B): ${toHex(data)}`, 'i');
 
-  // 1. Parse getSportSum response (b/b/d/l.smali)
-  // Payload returns: [stepCount 4B][distanceInCm 4B][calories 4B][totalTimeMinutes 2B]
-  if (data.length >= 14 && (data[0] !== 0x7C && data[0] !== 0x7D)) {
-    try {
-      const dv = new DataView(data.buffer);
-      const steps = dv.getUint32(0, true);
-      const distCm= dv.getUint32(4, true);
-      const cal   = dv.getUint32(8, true);
-      const mins  = dv.getUint16(12, true);
-
-      if (steps < 200000 && distCm < 50000000) {
-        statSteps.textContent = steps.toLocaleString();
-        statDist.textContent  = (distCm / 100000).toFixed(2);
-        statCal.textContent   = cal.toLocaleString();
-        statTime.textContent  = mins.toString();
-        ok(`🎯 Parsed Daily Sport Totals: Steps=${steps}, Dist=${(distCm/100000).toFixed(2)}km, Cal=${cal}kcal, Active=${mins}min`);
-      }
-    } catch(e){}
-  }
-
-  // 2. Parse SyncData Header / Chunks (0x7C / 0x7D)
-  if (data[0] === 0x7C && data.length >= 6) {
-    const dv = new DataView(data.buffer);
-    const blockSize = dv.getUint16(1, true);
-    ok(`📦 SyncData header: Block size = ${blockSize} bytes`);
-  }
-
-  if (waitResp) {
-    clearTimeout(waitResp.timer);
-    const w = waitResp; waitResp = null;
-    w.resolve(data);
+  if (data.length >= 3) {
+    const cmd = data[0];
+    const seq = data[1];
+    const res = data[2];
+    if (res === 1) ok(`✅ Watch acknowledged command 0x${cmd.toString(16).toUpperCase()} (Success).`);
+    else if (res === 0) warn(`⚠️ Watch returned code 0 for command 0x${cmd.toString(16).toUpperCase()}.`);
   }
 }
 
 // ===== Bluetooth Connection =====
 btnConnect.onclick = async () => {
   if (!navigator.bluetooth) {
-    err('Web Bluetooth is not supported in this browser. Use Chrome, Edge, or Opera.');
+    err('Web Bluetooth not supported. Use Chrome or Edge.');
     return;
   }
   try {
-    log('Scanning for WeLoop devices...', 'i');
+    log('Scanning for WeLoop Hey 3S...', 'i');
     const device = await navigator.bluetooth.requestDevice({
       filters: [
-        { namePrefix: 'WeLoop' },
+        { namePrefix: 'WeLoop Hey 3S' },
         { namePrefix: 'Hey 3S' },
-        { namePrefix: 'Tommy' },
-        { namePrefix: 'Now' }
+        { namePrefix: 'WeLoop' }
       ],
       optionalServices: [SVC_WELOOP, SVC_BATT]
     });
 
-    log(`Device selected: ${device.name || 'WeLoop Watch'} (${device.id})`, 'i');
+    log(`Device selected: ${device.name || 'Hey 3S'}`, 'i');
     server = await device.gatt.connect();
     setConnected(true);
 
@@ -421,27 +297,24 @@ btnConnect.onclick = async () => {
       warn('Device disconnected.');
     });
 
-    // WeLoop Service
     const svc = await server.getPrimaryService(SVC_WELOOP);
     rxChar = await svc.getCharacteristic(RX_CHAR);
     txChar = await svc.getCharacteristic(TX_CHAR);
     await txChar.startNotifications();
     txChar.addEventListener('characteristicvaluechanged', handleNotification);
-    ok('Subscribed to RX/TX telemetry channel.');
+    ok('Connected and subscribed to Hey 3S notifications.');
 
-    // Battery Service (Optional)
+    // Battery
     try {
       const bSvc = await server.getPrimaryService(SVC_BATT);
       battChar = await bSvc.getCharacteristic(CHAR_BATT);
       const val = await battChar.readValue();
       const pct = val.getUint8(0);
       batteryBadge.textContent = `Battery: ${pct}%`;
-      ok(`Battery Level: ${pct}%`);
-    } catch(e) {
-      mut('Battery service not available on this profile.');
-    }
+      ok(`Battery: ${pct}%`);
+    } catch(e){}
   } catch(e) {
-    err(`Connection error: ${e.message}`);
+    err(`Connection failed: ${e.message}`);
     setConnected(false);
   }
 };
@@ -452,171 +325,112 @@ btnDisconnect.onclick = () => {
 };
 
 btnReadBattery.onclick = async () => {
-  if (!battChar) { warn('Battery characteristic not found.'); return; }
-  try {
-    const val = await battChar.readValue();
-    const pct = val.getUint8(0);
-    batteryBadge.textContent = `Battery: ${pct}%`;
-    ok(`Battery Level: ${pct}%`);
-  } catch(e) { err(`Battery read failed: ${e.message}`); }
+  if (!battChar) return;
+  const val = await battChar.readValue();
+  const pct = val.getUint8(0);
+  batteryBadge.textContent = `Battery: ${pct}%`;
+  ok(`Battery: ${pct}%`);
 };
 
-// ===== Sport Tracking Commands =====
-// 1. Query Today's Sport Totals (b/b/d/l.smali - 0x9F)
-document.getElementById('btnGetSportSum').onclick = async () => {
-  try {
-    const frame = buildStandardFrame("H2DR", 0x9F, 0x00, 0x00);
-    await sendPacket(frame, 'Query Daily Totals (0x9F)');
-    ok('Requested daily sport summary. Waiting for response...');
-  } catch(e) { err(`Query totals failed: ${e.message}`); }
-};
-
-// 2. Sync Historical Sport Data (s.smali - 0x7C index 5)
-document.getElementById('btnSyncSportHistory').onclick = async () => {
-  try {
-    const pkt = buildSyncDataPacket(5, 0); // dataIndex = 5 (sport)
-    await sendPacket(pkt, 'Sync Historical Sport Logs (0x7C / 0x05)');
-    ok('Sent historical sport log request.');
-  } catch(e) { err(`Sync sport failed: ${e.message}`); }
-};
-
-// ===== GPS & Running Commands =====
-// 1. Start Watch GPS Running Mode (ar.smali - 0xA5 0x54 0x01)
-document.getElementById('btnGpsStart').onclick = async () => {
-  try {
-    const pkt = new Uint8Array([0xA5, 0x54, 0x01]);
-    await sendPacket(pkt, 'Start GPS Running Mode (0xA5 0x54 0x01)');
-    ok('✅ Watch GPS Running Mode activated!');
-  } catch(e) { err(`GPS start failed: ${e.message}`); }
-};
-
-// 2. Stop Watch GPS Running Mode (ar.smali - 0xA5 0x54 0x00)
-document.getElementById('btnGpsStop').onclick = async () => {
-  try {
-    const pkt = new Uint8Array([0xA5, 0x54, 0x00]);
-    await sendPacket(pkt, 'Stop GPS Running Mode (0xA5 0x54 0x00)');
-    ok('✅ Watch GPS Running Mode stopped.');
-  } catch(e) { err(`GPS stop failed: ${e.message}`); }
-};
-
-// 3. Query GPS Satellite EPO Info (i.smali - 0x9B)
-document.getElementById('btnQueryEpo').onclick = async () => {
-  try {
-    const frame = buildStandardFrame("H2DR", 0x9B, 0x00, 0x00);
-    await sendPacket(frame, 'Query GPS EPO Info (0x9B)');
-    ok('Requested GPS satellite ephemeris status.');
-  } catch(e) { err(`EPO query failed: ${e.message}`); }
-};
-
-// 4. Download Recorded GPS Track Points (s.smali - 0x7C index 14)
-document.getElementById('btnSyncGpsTrack').onclick = async () => {
-  try {
-    const pkt = buildSyncDataPacket(14, 0); // dataIndex = 14 (0x0E = GPS track)
-    await sendPacket(pkt, 'Sync GPS Track Coordinates (0x7C / 0x0E)');
-    ok('Sent GPS coordinate record download request.');
-  } catch(e) { err(`Sync GPS failed: ${e.message}`); }
-};
-
-// ===== Time Sync & Heart Rate =====
+// ===== 1. Time Synchronization (0x8C) =====
 document.getElementById('btnSyncTime').onclick = async () => {
-  const proto = document.getElementById('timeProto').value;
   const tz = parseFloat(document.getElementById('tz').value) || 8;
   const is24H = parseInt(document.getElementById('timeFormat').value, 10);
-
-  try {
-    if (proto === 'official') {
-      const handshake = buildStandardFrame("H2DR", 0x90, 0x0B, 0x00);
-      await sendPacket(handshake, 'Time Sync Step 1 Handshake (0x90)');
-      
-      const payload = build11ByteTimePayload(tz, is24H);
-      await sendPacket(payload, 'Time Sync Step 2 Calendar Payload (11B)');
-      ok('✅ Time synchronization packets dispatched.');
-    } else {
-      const nowUnix = Math.floor(Date.now() / 1000) - 1388534400;
-      const pkt = new Uint8Array(8);
-      pkt[0] = 140; // 0x8C
-      pkt[1] = 0x00;
-      const dv = new DataView(pkt.buffer, 2, 6);
-      dv.setUint32(0, nowUnix >>> 0, true);
-      dv.setUint8(4, Math.round((tz * 60) / 30) & 0xFF);
-      dv.setUint8(5, Math.round((tz * 60) / 15) & 0xFF);
-      await sendPacket(pkt, 'Legacy Time Packet (0x8C)');
-      ok('✅ Legacy time packet sent.');
-    }
-  } catch(e) { err(`Time sync error: ${e.message}`); }
+  const pkt = buildTimePacket(tz, is24H);
+  await sendPacket(pkt, 'Time Sync (0x8C)');
 };
 
-// Heart Rate Toggle (ae.smali - 0xA5 0x62)
+// ===== 2. Workout Tracking & GPS (0x98, 0x9B, 0x7C) =====
+// Cmd 0x98: r.smali f(Z)
+document.getElementById('btnWorkoutOn').onclick = async () => {
+  const pkt = buildV2Packet(0x98, [0x01]);
+  await sendPacket(pkt, 'Start Workout / GPS Tracking (0x98 0x01)');
+  ok('Workout mode started on watch.');
+};
+document.getElementById('btnWorkoutOff').onclick = async () => {
+  const pkt = buildV2Packet(0x98, [0x00]);
+  await sendPacket(pkt, 'Stop Workout / GPS Tracking (0x98 0x00)');
+  ok('Workout mode stopped.');
+};
+
+// Cmd 0x9B: i.smali
+document.getElementById('btnQueryEpo').onclick = async () => {
+  const pkt = buildV2Packet(0x9B, []);
+  await sendPacket(pkt, 'Query GPS Satellite EPO Status (0x9B)');
+};
+
+// Cmd 0x7C / 0x0E: GPS Track Point Sync
+document.getElementById('btnSyncGpsTrack').onclick = async () => {
+  const pkt = buildV2Packet(0x7C, [0x0E, 0x00, 0x00, 0x00, 0x00]);
+  await sendPacket(pkt, 'Request GPS Route Download (0x7C / 0x0E)');
+};
+
+// Cmd 0x7C / 0x05: Historical Sport Logs Sync
+document.getElementById('btnSyncSportData').onclick = async () => {
+  const pkt = buildV2Packet(0x7C, [0x05, 0x00, 0x00, 0x00, 0x00]);
+  await sendPacket(pkt, 'Request Historical Step Logs (0x7C / 0x05)');
+};
+
+// ===== 3. Continuous Heart Rate (0x97, 0x7C/0x06) =====
+// Cmd 0x97: r.smali g(Z)
 document.getElementById('btnHrOn').onclick = async () => {
-  try {
-    const pkt = new Uint8Array([0xA5, 0x62, 0x01, 0, 0, 0, 0, 0]);
-    await sendPacket(pkt, 'Enable Continuous Heart Rate (0xA5 0x62 0x01)');
-    ok('Continuous HR monitoring enabled.');
-  } catch(e) { err(`HR On failed: ${e.message}`); }
+  const pkt = buildV2Packet(0x97, [0x01]);
+  await sendPacket(pkt, 'Enable Continuous Heart Rate (0x97 0x01)');
+  ok('Continuous Heart Rate turned ON.');
 };
-
 document.getElementById('btnHrOff').onclick = async () => {
-  try {
-    const pkt = new Uint8Array([0xA5, 0x62, 0x00, 0, 0, 0, 0, 0]);
-    await sendPacket(pkt, 'Disable Continuous Heart Rate (0xA5 0x62 0x00)');
-    ok('Continuous HR monitoring disabled.');
-  } catch(e) { err(`HR Off failed: ${e.message}`); }
+  const pkt = buildV2Packet(0x97, [0x00]);
+  await sendPacket(pkt, 'Disable Continuous Heart Rate (0x97 0x00)');
+  ok('Continuous Heart Rate turned OFF.');
 };
 
-document.getElementById('btnSyncHrHistory').onclick = async () => {
-  try {
-    const pkt = buildSyncDataPacket(6, 0); // dataIndex = 6 (dynamic HR)
-    await sendPacket(pkt, 'Sync Dynamic HR History (0x7C / 0x06)');
-    ok('Sent heart rate log download request.');
-  } catch(e) { err(`Sync HR failed: ${e.message}`); }
+// Cmd 0x7C / 0x06: Dynamic HR History
+document.getElementById('btnSyncHrLogs').onclick = async () => {
+  const pkt = buildV2Packet(0x7C, [0x06, 0x00, 0x00, 0x00, 0x00]);
+  await sendPacket(pkt, 'Download Dynamic HR History (0x7C / 0x06)');
 };
 
-// ===== Device Settings =====
-// Gesture Light (ag.smali - 0xB7)
+// ===== 4. Device Settings =====
+// Gesture Light (r.smali d(Z) - 0x80)
 document.getElementById('btnGestureOn').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0xB7, 0, 1), 'Gesture Light On (0xB7 0x01)');
-  ok('Raise-to-wake gesture enabled.');
+  await sendPacket(buildV2Packet(0x80, [0x01]), 'Raise-to-Wake ON (0x80 0x01)');
 };
 document.getElementById('btnGestureOff').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0xB7, 0, 0), 'Gesture Light Off (0xB7 0x00)');
-  ok('Raise-to-wake gesture disabled.');
+  await sendPacket(buildV2Packet(0x80, [0x00]), 'Raise-to-Wake OFF (0x80 0x00)');
 };
 
-// Backlight (ac.smali - 0xB0)
-document.getElementById('selBacklight').onchange = async (e) => {
-  const val = parseInt(e.target.value, 10);
-  await sendPacket(buildStandardFrame("H2DR", 0xB0, 0, val), `Backlight Level ${val} (0xB0)`);
-  ok(`Backlight set to mode ${val}.`);
+// Wear Mode (r.smali e(Z) - 0x81)
+document.getElementById('btnWearLeft').onclick = async () => {
+  await sendPacket(buildV2Packet(0x81, [0x00]), 'Wear Left Hand (0x81 0x00)');
+};
+document.getElementById('btnWearRight').onclick = async () => {
+  await sendPacket(buildV2Packet(0x81, [0x01]), 'Wear Right Hand (0x81 0x01)');
 };
 
-// Anti-Lost (af.smali - 0xB2)
+// Anti-Lost (r.smali c(Z) - 0x88)
 document.getElementById('btnAntiLostOn').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0xB2, 0, 1), 'Anti-Lost On (0xB2 0x01)');
-  ok('Anti-lost warning enabled.');
+  await sendPacket(buildV2Packet(0x88, [0x01]), 'Anti-Lost ON (0x88 0x01)');
 };
 document.getElementById('btnAntiLostOff').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0xB2, 0, 0), 'Anti-Lost Off (0xB2 0x00)');
-  ok('Anti-lost warning disabled.');
+  await sendPacket(buildV2Packet(0x88, [0x00]), 'Anti-Lost OFF (0x88 0x00)');
 };
 
-// Camera Remote (m.smali 0x9C 0x18 / e.smali 0x9C 0x00)
-document.getElementById('btnCameraEnter').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0x9C, 0, 0x18), 'Enter Camera Mode (0x9C 0x18)');
-  ok('Opened camera shutter view on watch.');
+// Camera Screen (r.smali a(Z) - 0x8D)
+document.getElementById('btnCameraOn').onclick = async () => {
+  await sendPacket(buildV2Packet(0x8D, [0x01]), 'Open Camera Screen (0x8D 0x01)');
 };
-document.getElementById('btnCameraExit').onclick = async () => {
-  await sendPacket(buildStandardFrame("H2DR", 0x9C, 0, 0x00), 'Exit Camera Mode (0x9C 0x00)');
-  ok('Exited camera mode on watch.');
+document.getElementById('btnCameraOff').onclick = async () => {
+  await sendPacket(buildV2Packet(0x8D, [0x00]), 'Exit Camera Screen (0x8D 0x00)');
 };
 
-// Reboot Watch (w.smali - 0x89)
+// Reboot Watch (r.smali b(Z) - 0x89)
 document.getElementById('btnReboot').onclick = async () => {
-  if (!confirm('Reboot the watch now?')) return;
-  await sendPacket(buildStandardFrame("H2DR", 0x89, 1, 0), 'Watch Reboot (0x89 0x01)');
+  if (!confirm('Reboot the Hey 3S now?')) return;
+  await sendPacket(buildV2Packet(0x89, [0x00]), 'Watch Reboot (0x89 0x00)');
   ok('Dispatched reboot command.');
 };
 
-mut('Ready. Open in Google Chrome or Microsoft Edge and click "Connect Device".');
+mut('Ready. Open in Chrome or Edge and connect your Hey 3S.');
 </script>
 </body>
 </html>
