@@ -1,120 +1,118 @@
-# WeLoop 手表时间同步工具
+Here is the full translation of the README into English:
 
-> 停服也能对时间。一个 HTML 文件，用 Chrome 打开即可把 WeLoop Hey 3S 手表的时间同步为当前时间，无需安装任何 app，不依赖云端服务器。
+# WeLoop Watch Time Sync Tool
 
-WeLoop（唯乐）官方 app 早已停服，手表时间无法同步，云端登录走不通。
-本项目通过反编译官方 app，提取了 Hey 3S 的时间同步协议，用一个纯 HTML 页面（基于浏览器原生 Web Bluetooth API）完成时间同步。
+> Sync your watch time even after server shutdown. A single HTML file opened in Chrome lets you sync your WeLoop Hey 3S watch time to the current time—no app installation needed, with zero dependency on cloud servers.
 
-> 🔗 **在线直接用（无需下载）**：https://micookie2.github.io/weloop-hey3s-time-sync/
+The official WeLoop app has long been shut down, leaving users unable to sync their watch time or log into cloud services.
+By reverse-engineering the official app, this project extracted the Hey 3S time sync protocol and uses a pure HTML page (powered by the browser-native Web Bluetooth API) to accomplish time synchronization.
 
-## ✨ 特性
+> 🔗 **Use Online Directly (No Download Required)**: [https://micookie2.github.io/weloop-hey3s-time-sync/](https://micookie2.github.io/weloop-hey3s-time-sync/)
 
-- **零安装**：一个 HTML 文件，Chrome / Edge 打开即用
-- **零依赖**：不依赖 WeLoop 云端、不依赖 Python、不依赖任何 app
-- **跨平台**：Windows / macOS / Linux / 安卓 Chrome 都能用
-- **协议透明**：协议全部逆向自官方 app，源码开放
+## ✨ Features
 
-## 🚀 使用方法
+* **Zero Installation**: A single HTML file that works directly in Chrome / Edge.
+* **Zero Dependencies**: Independent of WeLoop cloud servers, Python, or any mobile app.
+* **Cross-Platform**: Works on Windows, macOS, Linux, and Android Chrome.
+* **Transparent Protocol**: Fully reverse-engineered from the official app with open source code.
 
-### 环境要求
+## 🚀 How to Use
 
-| 平台 | 浏览器 | 支持 |
-|------|--------|------|
-| Windows / macOS / Linux | Chrome、Edge、Opera | ✅ |
-| Android | Chrome（需 Android 6.0+，开启位置权限） | ✅ |
-| iOS / iPadOS | 任何浏览器 | ❌（Apple 不开放 Web Bluetooth） |
-| 任何平台 | Safari、Firefox | ❌ |
+### System Requirements
 
-## 🚀 使用方法
+| Platform | Browser | Supported |
+| --- | --- | --- |
+| Windows / macOS / Linux | Chrome, Edge, Opera | ✅ |
+| Android | Chrome (Requires Android 6.0+ with Location turned on) | ✅ |
+| iOS / iPadOS | Any Browser | ❌ (Apple does not support Web Bluetooth) |
+| Any Platform | Safari, Firefox | ❌ |
 
-### 环境要求
+### Method 1: Online Version (Recommended & Easiest)
 
-| 平台 | 浏览器 | 支持 |
-|------|--------|------|
-| Windows / macOS / Linux | Chrome、Edge、Opera | ✅ |
-| Android | Chrome（需 Android 6.0+，开启位置权限） | ✅ |
-| iOS / iPadOS | 任何浏览器 | ❌（Apple 不开放 Web Bluetooth） |
-| 任何平台 | Safari、Firefox | ❌ |
-
-### 方式一：在线版（推荐，最省事）
-
-直接在浏览器打开 GitHub Pages 托管的在线版，**无需下载、无需安装任何东西**：
+Simply open the online version hosted on GitHub Pages in your browser—**no downloading or installation required**:
 
 > 🔗 **[https://micookie2.github.io/weloop-hey3s-time-sync/](https://micookie2.github.io/weloop-hey3s-time-sync/)**
 
-打开后按下方「同步步骤」操作即可。建议收藏这个网址，以后随时对时间。
+Once opened, follow the "Synchronization Steps" below. We recommend bookmarking this page for future time syncing.
 
-### 方式二：本地运行（离线 / 在线版打不开时备用）
+### Method 2: Local Execution (Offline / Backup if Online Version is Unavailable)
 
-1. **下载** [index.html](./index.html) 到本地
-2. **取消系统配对**：到系统蓝牙设置里，如果 Hey 3S 已配对，先**取消配对 / 忽略该设备**（Web Bluetooth 不能使用已配对设备，这是浏览器规范限制）
-3. **用 Chrome 打开** `index.html`
-   - 直接双击（`file://`）在某些新版 Chrome 上可能被限制（Web Bluetooth 要求 https 或 localhost 安全来源），推荐用本地 http 服务器托管：
-     ```
-     cd 到 index.html 所在目录
-     python -m http.server 8000
-     ```
-     然后浏览器访问 `http://localhost:8000/`
-
-### 同步步骤
-
-1. **取消系统配对**：到系统蓝牙设置里，如果 Hey 3S 已配对，先**取消配对 / 忽略该设备**（Web Bluetooth 不能使用已配对设备，这是浏览器规范限制）
-2. 打开上面任一方式的页面，填时区（中国填 `8`），点 **「连接并同步时间」**
-3. Chrome 弹出蓝牙设备选择框，选 **WeLoop Hey 3S**
-4. 等待日志显示 `✅ 时间同步成功` 即可
-
-### 故障排除
-
-| 现象 | 解决 |
-|------|------|
-| 选择框里看不到 Hey 3S | 靠近手表 / 手表亮屏 / 系统蓝牙里取消已配对的 Hey 3S |
-| 提示"此浏览器不支持 Web Bluetooth" | 换 Chrome 或 Edge；iOS 不支持 |
-| 写入成功但时间显示 `00:00` | 时间戳字节序问题，本项目已修复（小端序） |
-| 写入成功但时间没变 | 部分固件需断开手表蓝牙重连后才刷新表盘显示 |
-| 连不上 | 先取消系统配对，再重试 |
-
-## 🔧 工作原理
-
-时间同步通过 BLE 发送一个 8 字节命令包：
+1. **Download** [index.html](https://www.google.com/search?q=./index.html) locally.
+2. **Unpair from System**: Go to your OS Bluetooth settings. If the Hey 3S is already paired, **unpair / forget the device** first (Web Bluetooth cannot connect to paired devices due to browser specification restrictions).
+3. **Open with Chrome**:
+* Double-clicking to open (`file://`) might be restricted in newer Chrome versions (Web Bluetooth requires secure origins like HTTPS or `localhost`). It is recommended to serve it via a local HTTP server:
+```bash
+cd /path/to/index.html
+python -m http.server 8000
 
 ```
-[cmd=140][seq=0][4字节时间戳][时区/30min][时区/15min]
+
+
+Then open `http://localhost:8000/` in your browser.
+
+
+
+### Synchronization Steps
+
+1. **Unpair from System**: Go to your OS Bluetooth settings. If the Hey 3S is already paired, **unpair / forget the device** first (Web Bluetooth cannot connect to already paired system devices).
+2. Open the page using either method above, enter your timezone (e.g., enter `8` for China UTC+8 or `-5` for EST), and click **"Connect & Sync Time"**.
+3. When the Chrome Bluetooth device selector pops up, choose **WeLoop Hey 3S**.
+4. Wait until the log displays `✅ Time sync successful`.
+
+### Troubleshooting
+
+| Issue | Solution |
+| --- | --- |
+| Hey 3S not visible in selector | Move closer to watch / turn on watch screen / unpair Hey 3S in OS Bluetooth settings |
+| Message: "Web Bluetooth is not supported" | Switch to Chrome or Edge; iOS is unsupported |
+| Write succeeds but watch shows `00:00` | Timestamp endianness issue; fixed in this project (uses Little-Endian) |
+| Write succeeds but watch time unchanged | Certain firmwares require disconnecting watch Bluetooth and reconnecting to refresh the watch face |
+| Failed to connect | Unpair from system Bluetooth settings first, then retry |
+
+## 🔧 How It Works
+
+Time synchronization sends an 8-byte command packet via BLE:
+
+```
+[cmd=140][seq=0][4-byte timestamp][TZ/30min][TZ/15min]
+
 ```
 
-- **时间戳**：`(Unix秒 - 1388534400)`，其中 `1388534400` = 2014-01-01 00:00:00 UTC（WeLoop 自定义纪元）
-- **字节序**：小端（little-endian）
-- **时区**：以 30 分钟和 15 分钟为单位的两个字节（中国 UTC+8 = 480 分钟 → 16 和 32）
+* **Timestamp**: `(Unix seconds - 1388534400)`, where `1388534400` = 2014-01-01 00:00:00 UTC (WeLoop custom epoch).
+* **Byte Order**: Little-Endian.
+* **Timezone**: Two bytes representing UTC offset measured in 30-minute and 15-minute intervals (e.g., China UTC+8 = 480 minutes → 16 and 32).
 
-BLE 通道使用 Nordic UART Service 的 weeloop 变体：
+The BLE channel uses a WeLoop variant of the Nordic UART Service:
 
-| 用途 | UUID |
-|------|------|
+| Purpose | UUID |
+| --- | --- |
 | Service | `6e400001-b5a3-f393-e0a9-77656c6f6f70` |
-| 写特征（手机→手表） | `6e400002-b5a3-f393-e0a9-77656c6f6f70` |
-| 通知特征（手表→手机） | `6e400003-b5a3-f393-e0a9-77656c6f6f70` |
+| Write Char (Phone → Watch) | `6e400002-b5a3-f393-e0a9-77656c6f6f70` |
+| Notify Char (Watch → Phone) | `6e400003-b5a3-f393-e0a9-77656c6f6f70` |
 
-UUID 后缀 `77656c6f6f70` 是 ASCII 字符串 **"weloop"**。
+The UUID suffix `77656c6f6f70` is the ASCII string **"weloop"**.
 
-详细协议逆向过程见 [PROTOCOL.md](./PROTOCOL.md)。
+For a detailed walkthrough of the reverse-engineered protocol, see [PROTOCOL.md](https://www.google.com/search?q=./PROTOCOL.md).
 
-## 📋 兼容性
+## 📋 Compatibility
 
-已实测：
-- ✅ **WeLoop Hey 3S**（`WeLoop Hey 3S` 广播名）
+Verified on:
 
-理论上同协议族的其他 WeLoop 设备（XH3、Now 3 / Neo 等）也可能适用，但未实测。欢迎反馈。
+* ✅ **WeLoop Hey 3S** (`WeLoop Hey 3S` broadcast name)
 
-## ⚠️ 免责声明
+Theoretically, other WeLoop devices using the same protocol family (e.g., XH3, Now 3 / Neo) might also work, but remain unverified. Feedback is welcome.
 
-- 本项目**仅供个人同步自己手表的时间使用**，不用于商业用途。
-- 协议通过**逆向工程** WeLoop 官方 app（已停服）所得，仅用于实现互操作。
-- 本项目**不包含** WeLoop 官方 app 的 APK 或反编译源码，仅包含独立编写的新代码。
-- 使用本工具的风险自负，作者不对任何设备损坏负责。
+## ⚠️ Disclaimer
 
-## 🙏 致谢
+* This project is **intended solely for personal time synchronization** on your own devices and not for commercial use.
+* The protocol was obtained via **reverse engineering** the official (defunct) WeLoop app strictly to enable interoperability.
+* This repository **does not contain** official WeLoop APK files or reverse-compiled source code; it contains only independently written code.
+* Use this tool at your own risk. The author accepts no liability for hardware damage.
 
-- 协议来源：WeLoop 官方 app（反编译分析）
-- 工具基于 [Web Bluetooth API](https://developer.mozilla.org/docs/Web/API/Web_Bluetooth_API)
+## 🙏 Acknowledgments
+
+* Protocol Source: WeLoop official app (reverse-engineering analysis)
+* Built using the [Web Bluetooth API](https://developer.mozilla.org/docs/Web/API/Web_Bluetooth_API)
 
 ## 📄 License
 
