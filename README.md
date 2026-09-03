@@ -186,7 +186,6 @@ Theoretically compatible with other devices in the WeLoop BLE family (e.g., WeLo
 
 * This project is **intended solely for personal device maintenance** on your own hardware and not for commercial use.
 * The protocol was obtained via **reverse engineering** the official (defunct) WeLoop app strictly to enable interoperability.
-* This repository **does not contain** official WeLoop APK files or reverse-compiled source code; it contains only independently written code.
 * **Use at your own risk**: The authors accept no liability for hardware malfunction, data loss, or bricked devices resulting from the use of experimental commands.
 
 ---
